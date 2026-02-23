@@ -1,0 +1,1 @@
+{"assistant_text":"hello","created_utc":"2026-02-22T00:00:00.000Z","messages":[{"content":"You are a deterministic test.","role":"system"},{"content":"Say hello.","role":"user"}],"model":{"model_id":"fixture-model","provider":"fixture"},"producer":{"instance_id":"selftest","name":"haai","version":"0.1.0"},"strength":"evidence"}
