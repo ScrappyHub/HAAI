@@ -1,4 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$RepoRoot,[Parameter(Mandatory=$true)][string]$PacketDir)
+param([Parameter(Mandatory=$true)
+$bad = $false
+][string]$RepoRoot,[Parameter(Mandatory=$true)][string]$PacketDir)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -37,6 +39,9 @@ foreach($ln in @($lines)){
   if(-not (Test-Path -LiteralPath $abs -PathType Leaf)){ Fail "MISSING_FILE" $p }
   $act = (Sha256HexBytes (ReadAllBytes $abs)).ToLowerInvariant()
   if($act -ne $h){ Fail "FILE_HASH_MISMATCH" $p }
+$bad = $true
 }
 Write-Output "OK: VERIFIED_PACKET_BYTESHA"
 exit 0
+
+if(False){ throw "VERIFY_FAIL" }
