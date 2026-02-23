@@ -1,8 +1,7 @@
-param([Parameter(Mandatory=$true)
-$bad = $false
-][string]$RepoRoot,[Parameter(Mandatory=$true)][string]$PacketDir)
+param([Parameter(Mandatory=$true)][string]$RepoRoot,[Parameter(Mandatory=$true)][string]$PacketDir)
 
 Set-StrictMode -Version Latest
+$bad = $false  # HAAI_VERIFIER_FAILGATE_V1
 $ErrorActionPreference = "Stop"
 
 function Fail([string]$token,[string]$detail){ Write-Output ($token + ":" + $detail); exit 2 }
