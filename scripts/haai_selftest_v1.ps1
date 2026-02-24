@@ -11,7 +11,6 @@ function Run-PSFile {
     [Parameter(Mandatory=$true)][string]$File,
     [Parameter(Mandatory=$true)][hashtable]$Args
   )
-
   $argv = New-Object System.Collections.Generic.List[string]
   [void]$argv.Add("-NoProfile")
   [void]$argv.Add("-NonInteractive")
@@ -19,14 +18,31 @@ function Run-PSFile {
   [void]$argv.Add("Bypass")
   [void]$argv.Add("-File")
   [void]$argv.Add($File)
-
   foreach($k in @($Args.Keys)){
     [void]$argv.Add(("-" + $k))
     [void]$argv.Add([string]$Args[$k])
   }
 
-  & $PSExe @($argv.ToArray()) 2>&1 | Out-Host
-  return [int]$LASTEXITCODE
+  $out = & $PSExe @($argv.ToArray()) 2>&1
+  $out | Out-Host
+  $code = [int]$LASTEXITCODE
+
+  $isVerify = $false
+  if($File -match "(?i)haai_verify_packet_optionA_v1\.ps1$"){ $isVerify = $true }
+
+  if($isVerify -and $Args.ContainsKey("PacketDir")){
+    $pd = [string]$Args["PacketDir"]
+    if($pd -match "(?i)golden_negative_"){
+      if($code -eq 0){ throw "VERIFY_NEGATIVE_EXPECTED_NONZERO" }
+      $joined = (@($out) | ForEach-Object { "$_" }) -join "`n"
+      if($joined -notmatch "FILE_HASH_MISMATCH"){ throw "VERIFY_NEGATIVE_MISSING_TOKEN_FILE_HASH_MISMATCH" }
+      $global:LASTEXITCODE = 0
+      return 0
+    }
+  }
+
+  if($code -ne 0){ throw ("RUN_PSFILE_EXIT_NONZERO: " + $code + " file=" + $File) }
+  return 0
 }
 
 $tv  = Join-Path $RepoRoot "test_vectors"
