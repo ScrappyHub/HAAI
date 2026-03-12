@@ -1,0 +1,14 @@
+# local runtime output
+_out/
+
+# local backup clutter
+*.bak
+*.bak.*
+*.tmp
+*.log
+
+# docker/local transient
+proofs/receipts/docker_recover/
+
+# editor noise
+.vscode/
