@@ -1,13 +1,15 @@
 name: haai
 services:
-  haai_port_guard:
-    container_name: haai_port_guard
-    image: alpine/socat
-    command:
-      - "TCP-LISTEN:${HAAI_PORT},fork,reuseaddr,bind=${HAAI_BIND}"
-      - "EXEC:/bin/cat"
+  haai_runtime:
+    container_name: haai_runtime
+    image: haai:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     ports:
-      - "${HAAI_BIND}:${HAAI_PORT}:${HAAI_PORT}"
+      - "${HAAI_BIND}:${HAAI_PORT}:54170"
     restart: unless-stopped
     networks:
       - haai_net

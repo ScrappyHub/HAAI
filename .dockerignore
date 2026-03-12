@@ -1,0 +1,14 @@
+.git
+_out
+proofs
+test_vectors
+scripts
+docs
+.github
+*.bak*
+*.tmp
+*.log
+!.env
+!Dockerfile
+!docker-compose.haai.yml
+!runtime/site/**

@@ -1,14 +1,30 @@
 # Docker status
 
-HAAI has a dedicated compose file and dedicated bind/port policy:
+HAAI now has a real dedicated Docker runtime surface.
+
+Locked values:
 
 - bind: 127.0.0.1
 - port: 54170
 - project: haai
 - network: haai_net
+- container: haai_runtime
 
-Current limitation:
+Current runtime surface:
 
-docker-compose.haai.yml is policy surface only until the repo has a real Dockerfile or buildable runtime image.
+- Dockerfile
+- .dockerignore
+- docker-compose.haai.yml
+- runtime/site/healthz
+- runtime/site/index.json
 
-If docker compose fails with a missing Dockerfile or missing image, that is expected until the runtime surface is implemented.
+Current behavior:
+
+- builds a local image `haai:local`
+- serves a minimal runtime endpoint on the dedicated HAAI port
+- does not share the compose project, container, or network with unrelated projects
+
+Live checks:
+
+- GET /healthz -> ok
+- GET /index.json -> runtime metadata

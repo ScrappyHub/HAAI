@@ -1,0 +1,9 @@
+{
+  "service": "haai",
+  "runtime": "minimal-httpd",
+  "status": "ok",
+  "bind": "127.0.0.1",
+  "port": 54170,
+  "container_name": "haai_runtime",
+  "network": "haai_net"
+}
