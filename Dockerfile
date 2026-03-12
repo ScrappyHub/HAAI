@@ -1,8 +1,6 @@
-FROM alpine:3.20
+FROM nginx:1.27-alpine
 
-WORKDIR /srv/www
-COPY runtime/site/ /srv/www/
+COPY runtime/site/ /usr/share/nginx/html/
+COPY runtime/nginx/default.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 54170
-
-CMD ["/bin/busybox","httpd","-f","-v","-p","54170","-h","/srv/www"]
