@@ -1,0 +1,18 @@
+name: haai
+services:
+  haai_port_guard:
+    container_name: haai_port_guard
+    image: alpine/socat
+    command:
+      - "TCP-LISTEN:${HAAI_PORT},fork,reuseaddr,bind=${HAAI_BIND}"
+      - "EXEC:/bin/cat"
+    ports:
+      - "${HAAI_BIND}:${HAAI_PORT}:${HAAI_PORT}"
+    restart: unless-stopped
+    networks:
+      - haai_net
+
+networks:
+  haai_net:
+    name: haai_net
+    driver: bridge
