@@ -1,0 +1,5 @@
+exit_code=0
+selftest_ok=true
+neg_verify_expected_fail_ok=true
+port_locked=true
+compose_locked=true
