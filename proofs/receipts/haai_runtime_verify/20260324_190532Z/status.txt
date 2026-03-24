@@ -1,0 +1,7 @@
+runtime_verify_ok=true
+bind=127.0.0.1
+port=54170
+container=haai_runtime
+network=haai_net
+health_ok=true
+index_ok=true

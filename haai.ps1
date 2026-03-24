@@ -23,7 +23,9 @@ function Parse-GateFile([string]$Path){
 
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $PSExe = (Get-Command powershell.exe -ErrorAction Stop).Source
-$docker = (Get-Command docker.exe -ErrorAction SilentlyContinue).Source
+$dockerCmd = Get-Command docker.exe -ErrorAction SilentlyContinue
+$docker = $null
+if($dockerCmd){ $docker = $dockerCmd.Source }
 
 $Selftest = Join-Path $RepoRoot "scripts\haai_selftest_v1.ps1"
 $FullGreen = Join-Path $RepoRoot "scripts\_RUN_haai_full_green_v1.ps1"
@@ -58,25 +60,21 @@ switch($Cmd){
   }
 
   "docker-up" {
-    if([string]::IsNullOrWhiteSpace($docker)){ Die "DOCKER_NOT_FOUND" }
+    if(-not $docker){ Die "DOCKER_NOT_FOUND" }
     if(-not (Test-Path -LiteralPath $Compose -PathType Leaf)){ Die "MISSING_COMPOSE" }
     if(-not (Test-Path -LiteralPath $Env -PathType Leaf)){ Die "MISSING_ENV" }
-
     & $docker compose -f $Compose --env-file $Env up -d --build
     if($LASTEXITCODE -ne 0){ Die ("DOCKER_UP_EXIT_NONZERO: " + $LASTEXITCODE) }
-
     Write-Host "HAAI_ENTRYPOINT_DOCKER_UP_GREEN" -ForegroundColor Green
     break
   }
 
   "docker-down" {
-    if([string]::IsNullOrWhiteSpace($docker)){ Die "DOCKER_NOT_FOUND" }
+    if(-not $docker){ Die "DOCKER_NOT_FOUND" }
     if(-not (Test-Path -LiteralPath $Compose -PathType Leaf)){ Die "MISSING_COMPOSE" }
     if(-not (Test-Path -LiteralPath $Env -PathType Leaf)){ Die "MISSING_ENV" }
-
     & $docker compose -f $Compose --env-file $Env down --remove-orphans
     if($LASTEXITCODE -ne 0){ Die ("DOCKER_DOWN_EXIT_NONZERO: " + $LASTEXITCODE) }
-
     Write-Host "HAAI_ENTRYPOINT_DOCKER_DOWN_GREEN" -ForegroundColor Green
     break
   }
@@ -88,23 +86,11 @@ switch($Cmd){
     Write-Host ("RUNTIME_VERIFY: " + $RuntimeVerify) -ForegroundColor Yellow
     Write-Host ("COMPOSE: " + $Compose) -ForegroundColor Yellow
     Write-Host ("ENV: " + $Env) -ForegroundColor Yellow
-
-    if(Test-Path -LiteralPath $Compose -PathType Leaf){
-      Write-Host "COMPOSE_PRESENT=true" -ForegroundColor Green
-    } else {
-      Write-Host "COMPOSE_PRESENT=false" -ForegroundColor Red
-    }
-
-    if(Test-Path -LiteralPath $Env -PathType Leaf){
-      Write-Host "ENV_PRESENT=true" -ForegroundColor Green
-    } else {
-      Write-Host "ENV_PRESENT=false" -ForegroundColor Red
-    }
-
-    if(-not [string]::IsNullOrWhiteSpace($docker)){
+    Write-Host ("COMPOSE_PRESENT=" + ([string](Test-Path -LiteralPath $Compose -PathType Leaf)).ToLowerInvariant()) -ForegroundColor Green
+    Write-Host ("ENV_PRESENT=" + ([string](Test-Path -LiteralPath $Env -PathType Leaf)).ToLowerInvariant()) -ForegroundColor Green
+    if($docker){
       & $docker ps --filter "name=^haai_runtime$" --format "table {{.Names}}`t{{.Ports}}`t{{.Status}}`t{{.Networks}}"
     }
-
     Write-Host "HAAI_ENTRYPOINT_STATUS_OK" -ForegroundColor Green
     break
   }
