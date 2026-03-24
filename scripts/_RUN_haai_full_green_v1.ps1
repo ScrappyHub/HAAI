@@ -68,7 +68,7 @@ if($envText -notmatch '(?m)^COMPOSE_PROJECT_NAME=haai$'){ Die "ENV_PROJECT_NOT_L
 $composeText = Get-Content -LiteralPath $composePath -Raw
 if($composeText -notmatch '(?m)^\s*name:\s*haai\s*$'){ Die "COMPOSE_NAME_NOT_LOCKED" }
 if($composeText -notmatch 'haai_net'){ Die "COMPOSE_NETWORK_NOT_LOCKED" }
-if($composeText -notmatch 'haai_port_guard'){ Die "COMPOSE_CONTAINER_NOT_LOCKED" }
+if($composeText -notmatch 'haai_runtime'){ Die "COMPOSE_CONTAINER_NOT_LOCKED" }
 
 # Run selftest in child powershell with deterministic transcript capture
 $p = Start-Process -FilePath $PSExe -ArgumentList @(

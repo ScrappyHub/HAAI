@@ -1,0 +1,13 @@
+powershell.exe : VERIFY_FAIL
+At C:\dev\haai\scripts\haai_selftest_v1.ps1:15 char:10
++   $out = & $PSExe @($Argv) 2>&1
++          ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (VERIFY_FAIL:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+At C:\dev\haai\scripts\haai_verify_packet_optionA_v1.ps1:57 char:5
++     throw "VERIFY_FAIL"
++     ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (VERIFY_FAIL:String) [], RuntimeException
+    + FullyQualifiedErrorId : VERIFY_FAIL
+ 
