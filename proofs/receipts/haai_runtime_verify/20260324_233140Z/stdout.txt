@@ -1,0 +1,5 @@
+container=haai_runtime|127.0.0.1:54170->54170/tcp|Up 2 days|haai_net
+network=haai_net
+health_status=200
+health_body=ok
+index_status=200
