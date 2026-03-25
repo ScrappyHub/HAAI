@@ -117,3 +117,26 @@ HAAI is complete as a standalone system when it can reproducibly prove:
 4. dedicated runtime verification on locked bind and port
 5. stable evidence and receipts across reruns
 6. clean operator control through haai.ps1
+
+## Operator entrypoint
+
+HAAI exposes one canonical top-level operator entrypoint:
+
+    .\haai.ps1 -Cmd status -RepoRoot .
+    .\haai.ps1 -Cmd selftest -RepoRoot .
+    .\haai.ps1 -Cmd full-green -RepoRoot .
+    .\haai.ps1 -Cmd runtime-verify -RepoRoot .
+    .\haai.ps1 -Cmd docker-up -RepoRoot .
+    .\haai.ps1 -Cmd docker-down -RepoRoot .
+
+Supported commands:
+
+- status shows the current local operator surface and runtime state
+- selftest runs the deterministic selftest
+- ull-green runs the authoritative full-green runner
+- 
+untime-verify verifies the dedicated runtime surface and writes evidence
+- docker-up builds and starts the dedicated HAAI runtime
+- docker-down stops and removes the dedicated HAAI runtime
+
+HAAI should be operated through haai.ps1 for normal top-level use.
