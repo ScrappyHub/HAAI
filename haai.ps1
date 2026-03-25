@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)]
-  [ValidateSet("selftest","full-green","runtime-verify","docker-up","docker-down","status")]
+  [ValidateSet("help","selftest","full-green","runtime-verify","docker-up","docker-down","status")]
   [string]$Cmd,
 
   [string]$RepoRoot = "."
@@ -38,7 +38,20 @@ Parse-GateFile $FullGreen
 Parse-GateFile $RuntimeVerify
 
 switch($Cmd){
-  "selftest" {
+    "help" {
+    Write-Host "HAAI COMMANDS" -ForegroundColor Yellow
+    Write-Host "  help            show operator commands" -ForegroundColor Yellow
+    Write-Host "  status          show repo/runtime status" -ForegroundColor Yellow
+    Write-Host "  selftest        run canonical selftest" -ForegroundColor Yellow
+    Write-Host "  full-green      run authoritative full-green runner" -ForegroundColor Yellow
+    Write-Host "  runtime-verify  verify live dedicated runtime" -ForegroundColor Yellow
+    Write-Host "  docker-up       build/start dedicated runtime" -ForegroundColor Yellow
+    Write-Host "  docker-down     stop/remove dedicated runtime" -ForegroundColor Yellow
+    Write-Host "HAAI_ENTRYPOINT_HELP_OK" -ForegroundColor Green
+    break
+  }
+
+"selftest" {
     & $PSExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Selftest -RepoRoot $RepoRoot
     if($LASTEXITCODE -ne 0){ Die ("SELFTEST_EXIT_NONZERO: " + $LASTEXITCODE) }
     Write-Host "HAAI_ENTRYPOINT_SELFTEST_GREEN" -ForegroundColor Green
