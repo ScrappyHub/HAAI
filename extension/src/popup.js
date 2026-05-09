@@ -11,6 +11,21 @@ function setText(value) {
   promptBox.value = value;
 }
 
+async function getActiveTab() {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tabs || tabs.length === 0 || !tabs[0].id) {
+    throw new Error("HAAI_NO_ACTIVE_TAB");
+  }
+  return tabs[0];
+}
+
+async function ensureContentScript(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ["src/content_script.js"]
+  });
+}
+
 pingButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_ping" }, (response) => {
     setText(JSON.stringify(response, null, 2));
@@ -30,28 +45,40 @@ stopButton.addEventListener("click", () => {
 });
 
 buildPromptButton.addEventListener("click", async () => {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  try {
+    const tab = await getActiveTab();
 
-  if (!tabs || tabs.length === 0 || !tabs[0].id) {
-    setText("HAAI_NO_ACTIVE_TAB");
-    return;
+    await ensureContentScript(tab.id);
+
+    chrome.tabs.sendMessage(tab.id, { type: "haai_build_context_prompt" }, (response) => {
+      if (chrome.runtime.lastError) {
+        setText("HAAI_CONTENT_SCRIPT_ERROR: " + chrome.runtime.lastError.message);
+        return;
+      }
+
+      if (!response || !response.ok) {
+        setText("HAAI_CONTEXT_PROMPT_FAILED");
+        return;
+      }
+
+      setText(response.prompt);
+    });
+  } catch (err) {
+    setText("HAAI_BUILD_PROMPT_ERROR: " + String(err && err.message ? err.message : err));
   }
-
-  chrome.tabs.sendMessage(tabs[0].id, { type: "haai_build_context_prompt" }, (response) => {
-    if (chrome.runtime.lastError) {
-      setText("HAAI_CONTENT_SCRIPT_ERROR: " + chrome.runtime.lastError.message);
-      return;
-    }
-
-    if (!response || !response.ok) {
-      setText("HAAI_CONTEXT_PROMPT_FAILED");
-      return;
-    }
-
-    setText(response.prompt);
-  });
 });
 
 copyPromptButton.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(promptBox.value || "");
+  try {
+    const value = promptBox.value || "";
+    if (!value.trim()) {
+      setText("HAAI_COPY_SKIPPED_EMPTY_PROMPT");
+      return;
+    }
+
+    await navigator.clipboard.writeText(value);
+    setText(value + "\n\nHAAI_COPY_OK");
+  } catch (err) {
+    setText("HAAI_COPY_FAIL: " + String(err && err.message ? err.message : err));
+  }
 });
