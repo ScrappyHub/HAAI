@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HAAI Recorder</title>
+  <style>
+    body { width: 360px; padding: 12px; font-family: system-ui, sans-serif; }
+    button { width: 100%; margin: 6px 0; padding: 8px; }
+    textarea { width: 100%; height: 220px; font-family: Consolas, monospace; }
+    .small { font-size: 12px; opacity: 0.75; }
+  </style>
+</head>
+<body>
+  <h2>HAAI Recorder</h2>
+  <p class="small">Local-first AI evidence recorder adapter.</p>
+
+  <button id="ping">Check background</button>
+  <button id="begin">Begin capture</button>
+  <button id="stop">Stop capture</button>
+  <button id="buildPrompt">Build context recovery prompt</button>
+  <button id="copyPrompt">Copy prompt</button>
+
+  <textarea id="promptBox" placeholder="Context recovery prompt appears here."></textarea>
+
+  <script src="popup.js"></script>
+</body>
+</html>
