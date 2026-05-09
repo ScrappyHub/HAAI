@@ -1,207 +1,177 @@
-const HAAI_CONTENT_MARK = "haai.content_script.v0_2";
+"use strict";
 
-function haaiNowIso() {
-  return new Date().toISOString();
-}
+if (!window.__HAAI_CONTENT_LOADED__) {
+  window.__HAAI_CONTENT_LOADED__ = true;
 
-function haaiDetectAiSurface() {
-  const raw = String(location.href || "") + " " + String(document.title || "");
-  const s = raw.toLowerCase();
+  let lastSnapshot = "";
 
-  const known = [
-    { key: "chatgpt", label: "ChatGPT", needles: ["chatgpt.com", "chat.openai.com"] },
-    { key: "claude", label: "Claude", needles: ["claude.ai"] },
-    { key: "gemini", label: "Gemini", needles: ["gemini.google.com"] },
-    { key: "perplexity", label: "Perplexity", needles: ["perplexity.ai"] },
-    { key: "copilot", label: "Copilot", needles: ["copilot.microsoft.com"] },
-    { key: "poe", label: "Poe", needles: ["poe.com"] },
-    { key: "mistral", label: "Mistral", needles: ["chat.mistral.ai"] },
-    { key: "grok", label: "Grok", needles: ["grok.com", "x.com/i/grok"] }
-  ];
-
-  for (const item of known) {
-    if (item.needles.some((needle) => s.includes(needle))) {
-      return item;
-    }
+  function cleanText(value) {
+    if (typeof value !== "string") { return ""; }
+    return value.replace(/\s+/g, " ").trim();
   }
 
-  return null;
-}
+  function detectProvider() {
+    const d = location.hostname.toLowerCase();
+    if (d.includes("chatgpt.com") || d.includes("openai.com")) { return "chatgpt"; }
+    if (d.includes("claude.ai")) { return "claude"; }
+    if (d.includes("gemini.google.com")) { return "gemini"; }
+    if (d.includes("perplexity.ai")) { return "perplexity"; }
+    if (d.includes("grok.com") || d.includes("x.ai")) { return "grok"; }
+    return "unknown";
+  }
 
-function haaiPageSnapshot() {
-  const text = (document.body && document.body.innerText ? document.body.innerText : "").slice(0, 12000);
-  const inputs = Array.from(document.querySelectorAll("textarea, input[type='text'], [contenteditable='true']")).slice(0, 20).map((el) => {
+  function detectInput() {
+    return Boolean(
+      document.querySelector("textarea") ||
+      document.querySelector("[contenteditable='true']") ||
+      document.querySelector("div[role='textbox']")
+    );
+  }
+
+  function collectMessages() {
+    const selectors = [
+      "[data-message-author-role]",
+      "article",
+      "[data-testid]",
+      ".markdown",
+      "main"
+    ];
+
+    const seen = new Set();
+    const messages = [];
+
+    for (const selector of selectors) {
+      const nodes = document.querySelectorAll(selector);
+
+      for (const node of nodes) {
+        const text = cleanText(node.innerText || node.textContent || "");
+        if (!text || text.length < 8) { continue; }
+        if (seen.has(text)) { continue; }
+
+        seen.add(text);
+
+        let role = "unknown";
+        const attr = node.getAttribute && node.getAttribute("data-message-author-role");
+        if (attr) { role = attr; }
+
+        messages.push({
+          role: role,
+          text: text,
+          length: text.length
+        });
+
+        if (messages.length >= 24) {
+          return messages;
+        }
+      }
+    }
+
+    return messages;
+  }
+
+  function surfacePayload(messages) {
+    const provider = detectProvider();
+    const domain = location.hostname;
+
     return {
-      tag: el.tagName.toLowerCase(),
-      role: el.getAttribute("role") || "",
-      ariaLabel: el.getAttribute("aria-label") || "",
-      placeholder: el.getAttribute("placeholder") || "",
-      valueLength: String(el.value || el.innerText || "").length
+      detected: provider !== "unknown" || messages.length > 0 || detectInput(),
+      provider: provider,
+      domain: domain,
+      url: location.href,
+      title: document.title || "",
+      message_count: messages.length,
+      input_detected: detectInput()
     };
-  });
-
-  return {
-    url: location.href,
-    title: document.title || "",
-    capturedAt: haaiNowIso(),
-    textLength: text.length,
-    textPreview: text.slice(0, 2000),
-    inputSurfaces: inputs
-  };
-}
-
-async function haaiRecord(eventType, extra) {
-  const detectedAiSurface = haaiDetectAiSurface();
-
-  return await chrome.runtime.sendMessage({
-    type: "haai_record_event",
-    event: Object.assign({
-      eventType,
-      detectedAiSurface,
-      page: {
-        url: location.href,
-        title: document.title || ""
-      },
-      snapshot: haaiPageSnapshot()
-    }, extra || {})
-  });
-}
-
-let haaiLastTextHash = "";
-
-function haaiHashText(s) {
-  let h = 0;
-  const text = String(s || "");
-  for (let i = 0; i < text.length; i++) {
-    h = ((h << 5) - h) + text.charCodeAt(i);
-    h |= 0;
   }
-  return String(h);
-}
 
-async function haaiPollCapture() {
-  try {
-    const stateResp = await chrome.runtime.sendMessage({ type: "haai_get_state" });
-    if (!stateResp || !stateResp.ok || !stateResp.state || !stateResp.state.active) {
-      return;
-    }
-
-    const snapshot = haaiPageSnapshot();
-    const sig = haaiHashText(snapshot.textPreview + "|" + snapshot.textLength + "|" + snapshot.title);
-
-    if (sig !== haaiLastTextHash) {
-      haaiLastTextHash = sig;
-      await haaiRecord("page_snapshot_changed", { reason: "poll_change_detected" });
-    }
-  } catch (_err) {
-  }
-}
-
-function haaiInstallInputListeners() {
-  document.addEventListener("input", async (ev) => {
-    const target = ev.target;
-    if (!target) {
-      return;
-    }
-
-    const tag = String(target.tagName || "").toLowerCase();
-    const editable = target.isContentEditable || tag === "textarea" || tag === "input";
-
-    if (!editable) {
-      return;
-    }
-
-    const value = String(target.value || target.innerText || "");
-    await haaiRecord("input_surface_changed", {
-      input: {
-        tag,
-        valueLength: value.length,
-        ariaLabel: target.getAttribute ? (target.getAttribute("aria-label") || "") : "",
-        placeholder: target.getAttribute ? (target.getAttribute("placeholder") || "") : ""
+  function emit(eventType, payload) {
+    chrome.runtime.sendMessage({
+      type: "haai_record_event",
+      event: {
+        schema: "haai.extension_event.v1",
+        event_type: eventType,
+        created_utc: new Date().toISOString(),
+        source: "content_script",
+        payload: payload
       }
     });
-  }, true);
-}
+  }
 
-async function haaiBuildContextPrompt() {
-  const eventsResp = await chrome.runtime.sendMessage({ type: "haai_get_events" });
-  const stateResp = await chrome.runtime.sendMessage({ type: "haai_get_state" });
-  const snapshot = haaiPageSnapshot();
-  const detected = haaiDetectAiSurface();
+  function probe() {
+    const messages = collectMessages();
+    const payload = surfacePayload(messages);
+    emit("page_probe", payload);
+    return payload;
+  }
 
-  const state = stateResp && stateResp.ok ? stateResp.state : null;
-  const events = eventsResp && eventsResp.ok ? eventsResp.events : [];
+  function scan() {
+    const messages = collectMessages();
+    const fp = JSON.stringify(messages).slice(-12000);
 
-  return [
-    "HAAI Context Recovery Prompt",
-    "",
-    "Use this as verified local browser-context evidence. Do not treat this as proof of truth; treat it as captured session context.",
-    "",
-    "State:",
-    JSON.stringify(state, null, 2),
-    "",
-    "Detected AI Surface:",
-    JSON.stringify(detected, null, 2),
-    "",
-    "Current Page Snapshot:",
-    JSON.stringify(snapshot, null, 2),
-    "",
-    "Recent Captured Events:",
-    JSON.stringify(events.slice(-25), null, 2)
-  ].join("\n");
-}
-
-if (!window[HAAI_CONTENT_MARK]) {
-  window[HAAI_CONTENT_MARK] = true;
-  haaiInstallInputListeners();
-  setInterval(haaiPollCapture, 3000);
-
-  chrome.runtime.sendMessage({
-    type: "haai_detect_ai_surface",
-    url: location.href,
-    title: document.title || ""
-  }, async (response) => {
-    if (response && response.ok && response.detectedAiSurface) {
-      await haaiRecord("content_script_ai_surface_ready", {
-        detectedAiSurface: response.detectedAiSurface
-      });
+    if (fp && fp !== lastSnapshot) {
+      lastSnapshot = fp;
+      const payload = surfacePayload(messages);
+      payload.messages = messages;
+      emit("conversation_snapshot", payload);
     }
-  });
-}
+  }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  (async () => {
-    if (!message || !message.type) {
-      sendResponse({ ok: false, error: "HAAI_BAD_CONTENT_MESSAGE" });
-      return;
-    }
+  function recoveryPrompt() {
+    const messages = collectMessages();
+    const payload = surfacePayload(messages);
+    const evidence = messages.map((m) => "[" + m.role + "] " + m.text).join("\n\n---\n\n");
 
-    if (message.type === "haai_ping_content") {
-      sendResponse({
-        ok: true,
-        result: "content_script_ready",
-        detectedAiSurface: haaiDetectAiSurface(),
-        page: { url: location.href, title: document.title || "" }
-      });
-      return;
+    return [
+      "HAAI CONTEXT RECOVERY REQUEST",
+      "",
+      "The recorder started during an existing AI conversation.",
+      "Reconstruct the current work context from the visible conversation evidence.",
+      "",
+      "Detected surface:",
+      "- provider: " + payload.provider,
+      "- domain: " + payload.domain,
+      "- title: " + payload.title,
+      "- messages visible: " + payload.message_count,
+      "- input detected: " + payload.input_detected,
+      "",
+      "Return:",
+      "1. What is being worked on.",
+      "2. Recent user instructions.",
+      "3. Recent assistant actions.",
+      "4. Current blockers or errors.",
+      "5. What should happen next.",
+      "6. Confidence and uncertainty.",
+      "",
+      "Evidence:",
+      evidence || "(No visible conversation text found.)"
+    ].join("\n");
+  }
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || typeof message !== "object") {
+      sendResponse({ ok: false, reason: "Invalid content message." });
+      return true;
     }
 
-    if (message.type === "haai_capture_probe") {
-      const result = await haaiRecord("manual_capture_probe", { reason: "popup_probe" });
-      sendResponse(Object.assign({ ok: true, result: "capture_probe_sent" }, { record: result }));
-      return;
+    if (message.type === "haai_probe_page") {
+      const payload = probe();
+      scan();
+      sendResponse({ ok: true, message: "Page probed.", surface: payload });
+      return true;
     }
 
     if (message.type === "haai_build_context_prompt") {
-      const prompt = await haaiBuildContextPrompt();
-      sendResponse({ ok: true, prompt });
-      return;
+      probe();
+      scan();
+      sendResponse({ ok: true, prompt: recoveryPrompt() });
+      return true;
     }
 
-    sendResponse({ ok: false, error: "HAAI_UNKNOWN_CONTENT_MESSAGE", type: message.type });
-  })().catch((err) => {
-    sendResponse({ ok: false, error: String(err && err.message ? err.message : err) });
+    sendResponse({ ok: false, reason: "Unknown content message." });
+    return true;
   });
 
-  return true;
-});
+  probe();
+  scan();
+  setInterval(scan, 2000);
+}
