@@ -11,44 +11,82 @@ function setText(value) {
   promptBox.value = value;
 }
 
-async function getActiveTab() {
+function renderState(state) {
+  const active = Boolean(state && state.active_capture);
+
+  beginButton.disabled = active;
+  stopButton.disabled = !active;
+
+  beginButton.textContent = active ? "Capture running" : "Begin capture";
+  stopButton.textContent = active ? "Stop capture" : "Capture stopped";
+}
+
+async function activeTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+
   if (!tabs || tabs.length === 0 || !tabs[0].id) {
     throw new Error("HAAI_NO_ACTIVE_TAB");
   }
+
   return tabs[0];
 }
 
-async function ensureContentScript(tabId) {
+async function injectContent(tabId) {
   await chrome.scripting.executeScript({
-    target: { tabId },
+    target: { tabId: tabId },
     files: ["src/content_script.js"]
+  });
+}
+
+function refreshState() {
+  chrome.runtime.sendMessage({ type: "haai_ping" }, (response) => {
+    if (response && response.ok) {
+      renderState(response.state);
+    }
   });
 }
 
 pingButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_ping" }, (response) => {
+    if (response && response.ok) {
+      renderState(response.state);
+    }
+
     setText(JSON.stringify(response, null, 2));
   });
 });
 
-beginButton.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "haai_begin_capture" }, (response) => {
-    setText(JSON.stringify(response, null, 2));
-  });
+beginButton.addEventListener("click", async () => {
+  try {
+    const tab = await activeTab();
+    await injectContent(tab.id);
+
+    chrome.runtime.sendMessage({ type: "haai_begin_capture" }, (response) => {
+      if (response && response.ok) {
+        renderState(response.state);
+      }
+
+      setText(JSON.stringify(response, null, 2));
+    });
+  } catch (err) {
+    setText("HAAI_BEGIN_CAPTURE_ERROR: " + String(err && err.message ? err.message : err));
+  }
 });
 
 stopButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_stop_capture" }, (response) => {
+    if (response && response.ok) {
+      renderState(response.state);
+    }
+
     setText(JSON.stringify(response, null, 2));
   });
 });
 
 buildPromptButton.addEventListener("click", async () => {
   try {
-    const tab = await getActiveTab();
-
-    await ensureContentScript(tab.id);
+    const tab = await activeTab();
+    await injectContent(tab.id);
 
     chrome.tabs.sendMessage(tab.id, { type: "haai_build_context_prompt" }, (response) => {
       if (chrome.runtime.lastError) {
@@ -71,6 +109,7 @@ buildPromptButton.addEventListener("click", async () => {
 copyPromptButton.addEventListener("click", async () => {
   try {
     const value = promptBox.value || "";
+
     if (!value.trim()) {
       setText("HAAI_COPY_SKIPPED_EMPTY_PROMPT");
       return;
@@ -82,3 +121,5 @@ copyPromptButton.addEventListener("click", async () => {
     setText("HAAI_COPY_FAIL: " + String(err && err.message ? err.message : err));
   }
 });
+
+refreshState();
