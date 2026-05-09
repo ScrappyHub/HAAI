@@ -1,0 +1,26 @@
+{
+  "schema": "haai.schema.v1",
+  "name": "haai_event_stream_v1",
+  "events": [
+    "session_started",
+    "page_seen",
+    "prompt_drafted",
+    "prompt_submitted",
+    "response_started",
+    "response_delta_seen",
+    "response_completed",
+    "tool_event_seen",
+    "error_seen",
+    "user_correction_seen",
+    "run_finalized",
+    "export_requested"
+  ],
+  "required_fields": [
+    "schema",
+    "event_id",
+    "event_type",
+    "created_utc",
+    "source",
+    "payload"
+  ]
+}

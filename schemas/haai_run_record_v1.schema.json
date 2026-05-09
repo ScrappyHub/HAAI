@@ -1,0 +1,28 @@
+{
+  "schema": "haai.schema.v1",
+  "name": "haai_run_record_v1",
+  "required_fields": [
+    "schema",
+    "created_utc",
+    "producer",
+    "model",
+    "input",
+    "output",
+    "result"
+  ],
+  "core_boundary": [
+    "capture",
+    "canonicalize",
+    "hash",
+    "bundle",
+    "verify",
+    "diff"
+  ],
+  "non_core": [
+    "truth_judgment",
+    "quality_score",
+    "policy_score",
+    "hallucination_label",
+    "training_label"
+  ]
+}
