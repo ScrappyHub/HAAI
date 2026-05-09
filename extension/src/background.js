@@ -1,156 +1,237 @@
-"use strict";
+const HAAI_STATE_KEY = "haai.capture.state.v1";
 
-const HAAI_STATE = {
-  extension_version: "0.1.0",
-  recorder_mode: "idle",
-  active_capture: false,
-  current_domain: "",
-  current_conversation_id: "",
-  events: []
+const DEFAULT_STATE = {
+  schema: "haai.capture.state.v1",
+  active: false,
+  sessionId: null,
+  startedAt: null,
+  stoppedAt: null,
+  eventCount: 0,
+  lastEventAt: null,
+  lastEventType: null,
+  lastPage: null,
+  detectedAiSurface: null
 };
 
-async function sha256Hex(text) {
-  const bytes = new TextEncoder().encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+function nowIso() {
+  return new Date().toISOString();
 }
 
-function pushEvent(event) {
-  HAAI_STATE.events.push(event);
-  if (HAAI_STATE.events.length > 1000) {
-    HAAI_STATE.events = HAAI_STATE.events.slice(-1000);
+function makeSessionId() {
+  return "haai-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+async function readState() {
+  const found = await chrome.storage.local.get(HAAI_STATE_KEY);
+  const state = found && found[HAAI_STATE_KEY] ? found[HAAI_STATE_KEY] : {};
+  return Object.assign({}, DEFAULT_STATE, state);
+}
+
+async function writeState(state) {
+  const clean = Object.assign({}, DEFAULT_STATE, state || {});
+  await chrome.storage.local.set({ [HAAI_STATE_KEY]: clean });
+  return clean;
+}
+
+async function publishState() {
+  const state = await readState();
+  try {
+    chrome.runtime.sendMessage({ type: "haai_state_changed", state });
+  } catch (_err) {
   }
+  return state;
 }
 
-function updateAwareness(event) {
-  if (!event || !event.page_url) {
+function detectAiSurface(url, title) {
+  const raw = String(url || "") + " " + String(title || "");
+  const s = raw.toLowerCase();
+
+  const known = [
+    { key: "chatgpt", label: "ChatGPT", needles: ["chatgpt.com", "chat.openai.com"] },
+    { key: "claude", label: "Claude", needles: ["claude.ai"] },
+    { key: "gemini", label: "Gemini", needles: ["gemini.google.com"] },
+    { key: "perplexity", label: "Perplexity", needles: ["perplexity.ai"] },
+    { key: "copilot", label: "Copilot", needles: ["copilot.microsoft.com"] },
+    { key: "poe", label: "Poe", needles: ["poe.com"] },
+    { key: "mistral", label: "Mistral", needles: ["chat.mistral.ai"] },
+    { key: "grok", label: "Grok", needles: ["grok.com", "x.com/i/grok"] }
+  ];
+
+  for (const item of known) {
+    if (item.needles.some((needle) => s.includes(needle))) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
+async function appendEvent(event) {
+  const state = await readState();
+  if (!state.active) {
+    return { ok: false, result: "capture_inactive" };
+  }
+
+  const next = Object.assign({}, state, {
+    eventCount: Number(state.eventCount || 0) + 1,
+    lastEventAt: nowIso(),
+    lastEventType: event && event.eventType ? event.eventType : "unknown",
+    lastPage: event && event.page ? event.page : state.lastPage,
+    detectedAiSurface: event && event.detectedAiSurface ? event.detectedAiSurface : state.detectedAiSurface
+  });
+
+  await writeState(next);
+
+  const key = "haai.capture.events." + next.sessionId;
+  const found = await chrome.storage.local.get(key);
+  const events = Array.isArray(found[key]) ? found[key] : [];
+  events.push(Object.assign({
+    schema: "haai.capture.event.v1",
+    sessionId: next.sessionId,
+    recordedAt: nowIso()
+  }, event || {}));
+
+  await chrome.storage.local.set({ [key]: events.slice(-500) });
+
+  return { ok: true, result: "event_recorded", state: next };
+}
+
+async function beginCapture(sender) {
+  const current = await readState();
+
+  if (current.active) {
+    return { ok: true, result: "capture_already_active", state: current };
+  }
+
+  const tab = sender && sender.tab ? sender.tab : null;
+  const detected = tab ? detectAiSurface(tab.url, tab.title) : null;
+
+  const next = Object.assign({}, DEFAULT_STATE, {
+    active: true,
+    sessionId: makeSessionId(),
+    startedAt: nowIso(),
+    stoppedAt: null,
+    eventCount: 0,
+    lastEventAt: null,
+    lastEventType: "capture_started",
+    lastPage: tab ? { url: tab.url || "", title: tab.title || "" } : null,
+    detectedAiSurface: detected
+  });
+
+  await writeState(next);
+  await publishState();
+
+  return { ok: true, result: "capture_started", state: next };
+}
+
+async function stopCapture() {
+  const current = await readState();
+
+  if (!current.active) {
+    return { ok: true, result: "capture_already_inactive", state: current };
+  }
+
+  const next = Object.assign({}, current, {
+    active: false,
+    stoppedAt: nowIso(),
+    lastEventAt: nowIso(),
+    lastEventType: "capture_stopped"
+  });
+
+  await writeState(next);
+  await publishState();
+
+  return { ok: true, result: "capture_stopped", state: next };
+}
+
+async function getEvents() {
+  const state = await readState();
+  if (!state.sessionId) {
+    return { ok: true, events: [], state };
+  }
+
+  const key = "haai.capture.events." + state.sessionId;
+  const found = await chrome.storage.local.get(key);
+  const events = Array.isArray(found[key]) ? found[key] : [];
+  return { ok: true, events, state };
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
+  const state = await readState();
+  await writeState(state);
+});
+
+chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") {
     return;
   }
 
-  let domain = "";
-  try {
-    domain = new URL(event.page_url).hostname;
-  } catch (err) {
-    domain = "";
+  const detected = detectAiSurface(tab.url, tab.title);
+  if (!detected) {
+    return;
   }
 
-  const conversationId = event.conversation_id || event.page_url || "";
-
-  if (domain && HAAI_STATE.current_domain && domain !== HAAI_STATE.current_domain) {
-    pushEvent({
-      schema: "haai.extension_event.v1",
-      event_type: "domain_changed",
-      created_utc: new Date().toISOString(),
-      source: "background",
-      from_domain: HAAI_STATE.current_domain,
-      to_domain: domain
-    });
+  const state = await readState();
+  if (!state.active) {
+    await writeState(Object.assign({}, state, {
+      detectedAiSurface: detected,
+      lastPage: { url: tab.url || "", title: tab.title || "" },
+      lastEventAt: nowIso(),
+      lastEventType: "ai_surface_detected"
+    }));
+    await publishState();
+    return;
   }
 
-  if (conversationId && HAAI_STATE.current_conversation_id && conversationId !== HAAI_STATE.current_conversation_id) {
-    pushEvent({
-      schema: "haai.extension_event.v1",
-      event_type: "conversation_changed",
-      created_utc: new Date().toISOString(),
-      source: "background",
-      from_conversation_id: HAAI_STATE.current_conversation_id,
-      to_conversation_id: conversationId
-    });
-  }
-
-  if (domain) {
-    HAAI_STATE.current_domain = domain;
-  }
-
-  if (conversationId) {
-    HAAI_STATE.current_conversation_id = conversationId;
-  }
-}
-
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("HAAI_BACKGROUND_READY");
+  await appendEvent({
+    eventType: "ai_surface_detected",
+    detectedAiSurface: detected,
+    page: { url: tab.url || "", title: tab.title || "" }
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || typeof message !== "object") {
-    sendResponse({ ok: false, reason: "INVALID_MESSAGE" });
-    return true;
-  }
-
-  if (message.type === "haai_ping") {
-    sendResponse({ ok: true, result: "pong", state: HAAI_STATE });
-    return true;
-  }
-
-  if (message.type === "haai_begin_capture") {
-    if (!HAAI_STATE.active_capture) {
-      HAAI_STATE.active_capture = true;
-      HAAI_STATE.recorder_mode = "capture";
-      pushEvent({
-        schema: "haai.extension_event.v1",
-        event_type: "capture_started",
-        created_utc: new Date().toISOString(),
-        source: "background"
-      });
+  (async () => {
+    if (!message || !message.type) {
+      sendResponse({ ok: false, error: "HAAI_BAD_MESSAGE" });
+      return;
     }
 
-    sendResponse({ ok: true, result: "capture_started", state: HAAI_STATE });
-    return true;
-  }
+    if (message.type === "haai_get_state") {
+      sendResponse({ ok: true, state: await readState() });
+      return;
+    }
 
-  if (message.type === "haai_stop_capture") {
-    HAAI_STATE.active_capture = false;
-    HAAI_STATE.recorder_mode = "idle";
-    pushEvent({
-      schema: "haai.extension_event.v1",
-      event_type: "capture_stopped",
-      created_utc: new Date().toISOString(),
-      source: "background"
-    });
+    if (message.type === "haai_begin_capture") {
+      sendResponse(await beginCapture(sender));
+      return;
+    }
 
-    sendResponse({ ok: true, result: "capture_stopped", state: HAAI_STATE });
-    return true;
-  }
+    if (message.type === "haai_stop_capture") {
+      sendResponse(await stopCapture());
+      return;
+    }
 
-  if (message.type === "haai_record_event") {
-    const event = message.event || {};
-    updateAwareness(event);
-    pushEvent(event);
-    sendResponse({ ok: true, result: "event_recorded", count: HAAI_STATE.events.length });
-    return true;
-  }
+    if (message.type === "haai_record_event") {
+      sendResponse(await appendEvent(message.event || {}));
+      return;
+    }
 
-  if (message.type === "haai_get_events") {
-    sendResponse({ ok: true, events: HAAI_STATE.events, state: HAAI_STATE });
-    return true;
-  }
+    if (message.type === "haai_get_events") {
+      sendResponse(await getEvents());
+      return;
+    }
 
-  if (message.type === "haai_export_capture") {
-    const createdUtc = new Date().toISOString();
-    const envelope = {
-      schema: "haai.extension_export.v1",
-      created_utc: createdUtc,
-      producer: {
-        name: "haai-extension",
-        version: HAAI_STATE.extension_version
-      },
-      capture_state: HAAI_STATE
-    };
+    if (message.type === "haai_detect_ai_surface") {
+      const detected = detectAiSurface(message.url || "", message.title || "");
+      sendResponse({ ok: true, detectedAiSurface: detected });
+      return;
+    }
 
-    const body = JSON.stringify(envelope, null, 2);
-    sha256Hex(body).then((hash) => {
-      sendResponse({
-        ok: true,
-        sha256: hash,
-        created_utc: createdUtc,
-        filename: "haai_capture_" + createdUtc.replace(/[:.]/g, "-") + "_" + hash.slice(0, 16) + ".json",
-        body: body
-      });
-    });
+    sendResponse({ ok: false, error: "HAAI_UNKNOWN_MESSAGE_TYPE", type: message.type });
+  })().catch((err) => {
+    sendResponse({ ok: false, error: String(err && err.message ? err.message : err) });
+  });
 
-    return true;
-  }
-
-  sendResponse({ ok: false, reason: "UNKNOWN_MESSAGE_TYPE" });
   return true;
 });

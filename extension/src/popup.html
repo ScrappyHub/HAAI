@@ -6,100 +6,87 @@
   <style>
     :root { color-scheme: dark; }
     body {
-      width: 380px;
-      margin: 0;
-      padding: 14px;
-      font-family: Inter, Segoe UI, system-ui, sans-serif;
+      font-family: Segoe UI, Arial, sans-serif;
       background: #0f172a;
       color: #e5e7eb;
-    }
-    .card {
-      background: #111827;
-      border: 1px solid #243044;
-      border-radius: 18px;
+      width: 390px;
+      margin: 0;
       padding: 14px;
-      box-shadow: 0 12px 28px rgba(0,0,0,.35);
     }
-    h2 { margin: 0; font-size: 18px; }
-    .small { margin: 5px 0 12px; color: #94a3b8; font-size: 12px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p { color: #94a3b8; margin: 4px 0 12px; }
     .status {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      background: #111827;
+      padding: 10px;
       margin-bottom: 10px;
-      font-size: 12px;
     }
     .pill {
-      padding: 5px 8px;
+      display: inline-block;
       border-radius: 999px;
-      background: #1e293b;
-      color: #cbd5e1;
-      border: 1px solid #334155;
-    }
-    .pill.on { background: #064e3b; color: #bbf7d0; border-color: #047857; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    button {
-      border: 0;
-      border-radius: 12px;
-      padding: 10px;
-      cursor: pointer;
-      background: #2563eb;
-      color: white;
-      font-weight: 650;
-    }
-    button.secondary { background: #334155; }
-    button.good { background: #059669; }
-    button.warn { background: #7c2d12; }
-    button.copied { background: #475569; color: #cbd5e1; }
-    button:disabled {
-      cursor: not-allowed;
-      opacity: .45;
+      padding: 5px 9px;
+      font-weight: 700;
+      margin-right: 6px;
       background: #334155;
-      color: #94a3b8;
+    }
+    .active { background: #166534; color: #dcfce7; }
+    .inactive { background: #7f1d1d; color: #fee2e2; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    button {
+      background: #38bdf8;
+      color: #06121f;
+      border: 0;
+      border-radius: 10px;
+      padding: 9px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
     }
     textarea {
-      box-sizing: border-box;
       width: 100%;
-      height: 230px;
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 14px;
-      border: 1px solid #334155;
+      height: 220px;
+      box-sizing: border-box;
       background: #020617;
       color: #e5e7eb;
-      font: 12px Consolas, ui-monospace, monospace;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 10px;
       resize: vertical;
     }
-    #notice {
-      min-height: 18px;
-      margin-top: 8px;
-      color: #93c5fd;
-      font-size: 12px;
-    }
+    .small { font-size: 12px; color: #94a3b8; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>HAAI Recorder</h2>
-    <p class="small">Local-first AI evidence recorder adapter.</p>
+  <h1>HAAI Recorder</h1>
+  <p>Local-first AI evidence recorder adapter.</p>
 
-    <div class="status">
-      <span id="capturePill" class="pill">Idle</span>
-      <span id="eventPill" class="pill">0 events</span>
+  <div class="status">
+    <div>
+      <span id="statePill" class="pill inactive">Inactive</span>
+      <span id="surfacePill" class="pill">No AI surface detected</span>
     </div>
-
-    <div class="grid">
-      <button id="ping" class="secondary">Status</button>
-      <button id="begin" class="good">Begin</button>
-      <button id="stop" class="warn">Stop</button>
-      <button id="buildPrompt">Recovery Prompt</button>
-    </div>
-
-    <button id="copyPrompt" class="secondary" style="margin-top:8px;width:100%;">Copy prompt</button><button id="exportCapture" class="secondary" style="margin-top:8px;width:100%;">Export capture</button>
-
-    <textarea id="promptBox" placeholder="Context recovery prompt appears here."></textarea>
-    <div id="notice">Ready.</div>
+    <div class="small" id="stateDetails">Loading state...</div>
   </div>
+
+  <div class="grid">
+    <button id="checkButton">Check</button>
+    <button id="probeButton">Probe Page</button>
+    <button id="beginButton">Begin Capture</button>
+    <button id="stopButton">Stop Capture</button>
+    <button id="buildPromptButton">Build Context Prompt</button>
+    <button id="copyPromptButton">Copy Prompt</button>
+  </div>
+
+  <textarea id="promptBox" placeholder="HAAI output appears here."></textarea>
 
   <script src="popup.js"></script>
 </body>

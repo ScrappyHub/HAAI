@@ -1,178 +1,207 @@
-"use strict";
+const HAAI_CONTENT_MARK = "haai.content_script.v0_2";
 
-if (!window.__HAAI_CONTENT_SCRIPT_LOADED__) {
-  window.__HAAI_CONTENT_SCRIPT_LOADED__ = true;
+function haaiNowIso() {
+  return new Date().toISOString();
+}
 
-  let haaiLastFingerprint = "";
+function haaiDetectAiSurface() {
+  const raw = String(location.href || "") + " " + String(document.title || "");
+  const s = raw.toLowerCase();
 
-  function norm(value) {
-    if (typeof value !== "string") { return ""; }
-    return value.replace(/\s+/g, " ").trim();
-  }
+  const known = [
+    { key: "chatgpt", label: "ChatGPT", needles: ["chatgpt.com", "chat.openai.com"] },
+    { key: "claude", label: "Claude", needles: ["claude.ai"] },
+    { key: "gemini", label: "Gemini", needles: ["gemini.google.com"] },
+    { key: "perplexity", label: "Perplexity", needles: ["perplexity.ai"] },
+    { key: "copilot", label: "Copilot", needles: ["copilot.microsoft.com"] },
+    { key: "poe", label: "Poe", needles: ["poe.com"] },
+    { key: "mistral", label: "Mistral", needles: ["chat.mistral.ai"] },
+    { key: "grok", label: "Grok", needles: ["grok.com", "x.com/i/grok"] }
+  ];
 
-  function provider() {
-    const host = String(location.hostname || "").toLowerCase();
-    if (host.includes("chatgpt.com") || host.includes("openai.com")) { return "chatgpt"; }
-    if (host.includes("claude.ai")) { return "claude"; }
-    if (host.includes("gemini.google.com")) { return "gemini"; }
-    if (host.includes("perplexity.ai")) { return "perplexity"; }
-    if (host.includes("grok.com") || host.includes("x.ai")) { return "grok"; }
-    return "unknown";
-  }
-
-  function conversationId() {
-    return location.hostname + location.pathname;
-  }
-
-  function modelLabel() {
-    const text = norm(document.body ? document.body.innerText || "" : "");
-    const matches = text.match(/\b(GPT-5|GPT-4o|GPT-4|Claude|Gemini|Grok|Perplexity)\b/gi);
-    if (!matches || matches.length === 0) { return "unknown"; }
-    return matches[0];
-  }
-
-  function roleForNode(node) {
-    const attr = node.getAttribute && node.getAttribute("data-message-author-role");
-    if (attr) { return attr; }
-
-    const text = norm(node.innerText || node.textContent || "");
-    if (text.match(/^(you|user)\b[: ]/i)) { return "user"; }
-    if (text.match(/^(assistant|chatgpt|claude|gemini)\b[: ]/i)) { return "assistant"; }
-
-    return "unknown";
-  }
-
-  function collectMessages() {
-    const selectors = [
-      "[data-message-author-role]",
-      "article",
-      ".markdown",
-      ".message"
-    ];
-
-    const seen = new Set();
-    const out = [];
-
-    for (const selector of selectors) {
-      const nodes = document.querySelectorAll(selector);
-
-      for (const node of nodes) {
-        const text = norm(node.innerText || node.textContent || "");
-        if (!text || text.length < 4) { continue; }
-        if (seen.has(text)) { continue; }
-
-        seen.add(text);
-        out.push({
-          role: roleForNode(node),
-          text: text,
-          length: text.length
-        });
-      }
+  for (const item of known) {
+    if (item.needles.some((needle) => s.includes(needle))) {
+      return item;
     }
-
-    return out.slice(-24);
   }
 
-  function fingerprint(messages) {
-    return JSON.stringify(messages).slice(-12000);
+  return null;
+}
+
+function haaiPageSnapshot() {
+  const text = (document.body && document.body.innerText ? document.body.innerText : "").slice(0, 12000);
+  const inputs = Array.from(document.querySelectorAll("textarea, input[type='text'], [contenteditable='true']")).slice(0, 20).map((el) => {
+    return {
+      tag: el.tagName.toLowerCase(),
+      role: el.getAttribute("role") || "",
+      ariaLabel: el.getAttribute("aria-label") || "",
+      placeholder: el.getAttribute("placeholder") || "",
+      valueLength: String(el.value || el.innerText || "").length
+    };
+  });
+
+  return {
+    url: location.href,
+    title: document.title || "",
+    capturedAt: haaiNowIso(),
+    textLength: text.length,
+    textPreview: text.slice(0, 2000),
+    inputSurfaces: inputs
+  };
+}
+
+async function haaiRecord(eventType, extra) {
+  const detectedAiSurface = haaiDetectAiSurface();
+
+  return await chrome.runtime.sendMessage({
+    type: "haai_record_event",
+    event: Object.assign({
+      eventType,
+      detectedAiSurface,
+      page: {
+        url: location.href,
+        title: document.title || ""
+      },
+      snapshot: haaiPageSnapshot()
+    }, extra || {})
+  });
+}
+
+let haaiLastTextHash = "";
+
+function haaiHashText(s) {
+  let h = 0;
+  const text = String(s || "");
+  for (let i = 0; i < text.length; i++) {
+    h = ((h << 5) - h) + text.charCodeAt(i);
+    h |= 0;
   }
+  return String(h);
+}
 
-  function emit(eventType, payload) {
-    chrome.runtime.sendMessage({
-      type: "haai_record_event",
-      event: {
-        schema: "haai.extension_event.v1",
-        event_type: eventType,
-        created_utc: new Date().toISOString(),
-        source: "content_script",
-        provider: provider(),
-        model: modelLabel(),
-        page_url: location.href,
-        page_title: document.title,
-        conversation_id: conversationId(),
-        payload: payload || {}
-      }
-    });
-  }
-
-  function scan() {
-    const messages = collectMessages();
-    const fp = fingerprint(messages);
-
-    if (!fp || fp === haaiLastFingerprint) {
+async function haaiPollCapture() {
+  try {
+    const stateResp = await chrome.runtime.sendMessage({ type: "haai_get_state" });
+    if (!stateResp || !stateResp.ok || !stateResp.state || !stateResp.state.active) {
       return;
     }
 
-    haaiLastFingerprint = fp;
+    const snapshot = haaiPageSnapshot();
+    const sig = haaiHashText(snapshot.textPreview + "|" + snapshot.textLength + "|" + snapshot.title);
 
-    emit("conversation_snapshot", {
-      message_count: messages.length,
-      messages: messages
+    if (sig !== haaiLastTextHash) {
+      haaiLastTextHash = sig;
+      await haaiRecord("page_snapshot_changed", { reason: "poll_change_detected" });
+    }
+  } catch (_err) {
+  }
+}
+
+function haaiInstallInputListeners() {
+  document.addEventListener("input", async (ev) => {
+    const target = ev.target;
+    if (!target) {
+      return;
+    }
+
+    const tag = String(target.tagName || "").toLowerCase();
+    const editable = target.isContentEditable || tag === "textarea" || tag === "input";
+
+    if (!editable) {
+      return;
+    }
+
+    const value = String(target.value || target.innerText || "");
+    await haaiRecord("input_surface_changed", {
+      input: {
+        tag,
+        valueLength: value.length,
+        ariaLabel: target.getAttribute ? (target.getAttribute("aria-label") || "") : "",
+        placeholder: target.getAttribute ? (target.getAttribute("placeholder") || "") : ""
+      }
     });
-  }
+  }, true);
+}
 
-  function recoveryPrompt(messages) {
-    const evidence = messages.map((m) => "[" + m.role + "] " + m.text).join("\n\n---\n\n");
+async function haaiBuildContextPrompt() {
+  const eventsResp = await chrome.runtime.sendMessage({ type: "haai_get_events" });
+  const stateResp = await chrome.runtime.sendMessage({ type: "haai_get_state" });
+  const snapshot = haaiPageSnapshot();
+  const detected = haaiDetectAiSurface();
 
-    return [
-      "HAAI CONTEXT RECOVERY REQUEST",
-      "",
-      "Reconstruct the current AI work session from this captured conversation evidence.",
-      "",
-      "Return:",
-      "1. What is being worked on.",
-      "2. Recent user instructions.",
-      "3. Recent assistant actions.",
-      "4. Current blockers or errors.",
-      "5. Likely model/provider context.",
-      "6. Next best action.",
-      "7. Confidence and uncertainty.",
-      "",
-      "Provider: " + provider(),
-      "Model label if visible: " + modelLabel(),
-      "Conversation ID: " + conversationId(),
-      "URL: " + location.href,
-      "",
-      "Evidence:",
-      evidence
-    ].join("\n");
-  }
+  const state = stateResp && stateResp.ok ? stateResp.state : null;
+  const events = eventsResp && eventsResp.ok ? eventsResp.events : [];
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || typeof message !== "object") {
-      sendResponse({ ok: false, reason: "INVALID_MESSAGE" });
-      return true;
+  return [
+    "HAAI Context Recovery Prompt",
+    "",
+    "Use this as verified local browser-context evidence. Do not treat this as proof of truth; treat it as captured session context.",
+    "",
+    "State:",
+    JSON.stringify(state, null, 2),
+    "",
+    "Detected AI Surface:",
+    JSON.stringify(detected, null, 2),
+    "",
+    "Current Page Snapshot:",
+    JSON.stringify(snapshot, null, 2),
+    "",
+    "Recent Captured Events:",
+    JSON.stringify(events.slice(-25), null, 2)
+  ].join("\n");
+}
+
+if (!window[HAAI_CONTENT_MARK]) {
+  window[HAAI_CONTENT_MARK] = true;
+  haaiInstallInputListeners();
+  setInterval(haaiPollCapture, 3000);
+
+  chrome.runtime.sendMessage({
+    type: "haai_detect_ai_surface",
+    url: location.href,
+    title: document.title || ""
+  }, async (response) => {
+    if (response && response.ok && response.detectedAiSurface) {
+      await haaiRecord("content_script_ai_surface_ready", {
+        detectedAiSurface: response.detectedAiSurface
+      });
+    }
+  });
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  (async () => {
+    if (!message || !message.type) {
+      sendResponse({ ok: false, error: "HAAI_BAD_CONTENT_MESSAGE" });
+      return;
+    }
+
+    if (message.type === "haai_ping_content") {
+      sendResponse({
+        ok: true,
+        result: "content_script_ready",
+        detectedAiSurface: haaiDetectAiSurface(),
+        page: { url: location.href, title: document.title || "" }
+      });
+      return;
+    }
+
+    if (message.type === "haai_capture_probe") {
+      const result = await haaiRecord("manual_capture_probe", { reason: "popup_probe" });
+      sendResponse(Object.assign({ ok: true, result: "capture_probe_sent" }, { record: result }));
+      return;
     }
 
     if (message.type === "haai_build_context_prompt") {
-      const messages = collectMessages();
-      sendResponse({
-        ok: true,
-        provider: provider(),
-        model: modelLabel(),
-        conversation_id: conversationId(),
-        message_count: messages.length,
-        prompt: recoveryPrompt(messages)
-      });
-      return true;
+      const prompt = await haaiBuildContextPrompt();
+      sendResponse({ ok: true, prompt });
+      return;
     }
 
-    if (message.type === "haai_force_scan") {
-      scan();
-      sendResponse({ ok: true, result: "scan_completed" });
-      return true;
-    }
-
-    sendResponse({ ok: false, reason: "UNKNOWN_CONTENT_MESSAGE" });
-    return true;
+    sendResponse({ ok: false, error: "HAAI_UNKNOWN_CONTENT_MESSAGE", type: message.type });
+  })().catch((err) => {
+    sendResponse({ ok: false, error: String(err && err.message ? err.message : err) });
   });
 
-  emit("content_script_loaded", {
-    provider: provider(),
-    model: modelLabel(),
-    conversation_id: conversationId()
-  });
-
-  setInterval(scan, 2000);
-  scan();
-}
+  return true;
+});
