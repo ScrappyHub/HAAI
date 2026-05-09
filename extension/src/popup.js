@@ -6,6 +6,13 @@ const beginButton = document.getElementById("begin");
 const stopButton = document.getElementById("stop");
 const buildPromptButton = document.getElementById("buildPrompt");
 const copyPromptButton = document.getElementById("copyPrompt");
+const capturePill = document.getElementById("capturePill");
+const eventPill = document.getElementById("eventPill");
+const notice = document.getElementById("notice");
+
+function setNotice(value) {
+  notice.textContent = value;
+}
 
 function setText(value) {
   promptBox.value = value;
@@ -13,12 +20,15 @@ function setText(value) {
 
 function renderState(state) {
   const active = Boolean(state && state.active_capture);
+  const count = state && Array.isArray(state.events) ? state.events.length : 0;
 
   beginButton.disabled = active;
   stopButton.disabled = !active;
 
-  beginButton.textContent = active ? "Capture running" : "Begin capture";
-  stopButton.textContent = active ? "Stop capture" : "Capture stopped";
+  capturePill.textContent = active ? "Capturing" : "Idle";
+  capturePill.className = active ? "pill on" : "pill";
+
+  eventPill.textContent = String(count) + " events";
 }
 
 async function activeTab() {
@@ -38,22 +48,28 @@ async function injectContent(tabId) {
   });
 }
 
-function refreshState() {
+function refreshState(showText) {
   chrome.runtime.sendMessage({ type: "haai_ping" }, (response) => {
     if (response && response.ok) {
       renderState(response.state);
+
+      if (showText) {
+        const count = response.state && Array.isArray(response.state.events) ? response.state.events.length : 0;
+        setText("HAAI STATUS\nmode=" + response.state.recorder_mode + "\nactive=" + response.state.active_capture + "\nevents=" + count);
+      }
+
+      setNotice("Status refreshed.");
+      return;
+    }
+
+    if (showText) {
+      setText(JSON.stringify(response, null, 2));
     }
   });
 }
 
 pingButton.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "haai_ping" }, (response) => {
-    if (response && response.ok) {
-      renderState(response.state);
-    }
-
-    setText(JSON.stringify(response, null, 2));
-  });
+  refreshState(true);
 });
 
 beginButton.addEventListener("click", async () => {
@@ -64,11 +80,13 @@ beginButton.addEventListener("click", async () => {
     chrome.runtime.sendMessage({ type: "haai_begin_capture" }, (response) => {
       if (response && response.ok) {
         renderState(response.state);
+        setNotice(response.result === "already_capturing" ? "Capture already running." : "Capture started.");
       }
 
       setText(JSON.stringify(response, null, 2));
     });
   } catch (err) {
+    setNotice("Begin failed.");
     setText("HAAI_BEGIN_CAPTURE_ERROR: " + String(err && err.message ? err.message : err));
   }
 });
@@ -77,6 +95,7 @@ stopButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_stop_capture" }, (response) => {
     if (response && response.ok) {
       renderState(response.state);
+      setNotice("Capture stopped.");
     }
 
     setText(JSON.stringify(response, null, 2));
@@ -90,18 +109,22 @@ buildPromptButton.addEventListener("click", async () => {
 
     chrome.tabs.sendMessage(tab.id, { type: "haai_build_context_prompt" }, (response) => {
       if (chrome.runtime.lastError) {
+        setNotice("Content script unavailable.");
         setText("HAAI_CONTENT_SCRIPT_ERROR: " + chrome.runtime.lastError.message);
         return;
       }
 
       if (!response || !response.ok) {
+        setNotice("Prompt build failed.");
         setText("HAAI_CONTEXT_PROMPT_FAILED");
         return;
       }
 
       setText(response.prompt);
+      setNotice("Recovery prompt built. Ready to copy.");
     });
   } catch (err) {
+    setNotice("Prompt build failed.");
     setText("HAAI_BUILD_PROMPT_ERROR: " + String(err && err.message ? err.message : err));
   }
 });
@@ -111,15 +134,25 @@ copyPromptButton.addEventListener("click", async () => {
     const value = promptBox.value || "";
 
     if (!value.trim()) {
-      setText("HAAI_COPY_SKIPPED_EMPTY_PROMPT");
+      setNotice("Nothing to copy.");
       return;
     }
 
     await navigator.clipboard.writeText(value);
-    setText(value + "\n\nHAAI_COPY_OK");
+
+    copyPromptButton.textContent = "Copied prompt";
+    copyPromptButton.className = "copied";
+    copyPromptButton.disabled = true;
+    setNotice("Copied prompt to clipboard.");
+
+    setTimeout(() => {
+      copyPromptButton.textContent = "Copy prompt";
+      copyPromptButton.className = "secondary";
+      copyPromptButton.disabled = false;
+    }, 1600);
   } catch (err) {
-    setText("HAAI_COPY_FAIL: " + String(err && err.message ? err.message : err));
+    setNotice("Copy failed.");
   }
 });
 
-refreshState();
+refreshState(false);
