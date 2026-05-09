@@ -5,110 +5,79 @@ if (!window.__HAAI_CONTENT_SCRIPT_LOADED__) {
 
   let haaiLastFingerprint = "";
 
-  function haaiNormalizeText(value) {
-    if (typeof value !== "string") {
-      return "";
-    }
-
+  function norm(value) {
+    if (typeof value !== "string") { return ""; }
     return value.replace(/\s+/g, " ").trim();
   }
 
-  function haaiDetectProvider() {
+  function provider() {
     const host = String(location.hostname || "").toLowerCase();
+    if (host.includes("chatgpt.com") || host.includes("openai.com")) { return "chatgpt"; }
+    if (host.includes("claude.ai")) { return "claude"; }
+    if (host.includes("gemini.google.com")) { return "gemini"; }
+    if (host.includes("perplexity.ai")) { return "perplexity"; }
+    if (host.includes("grok.com") || host.includes("x.ai")) { return "grok"; }
+    return "unknown";
+  }
 
-    if (host.includes("chatgpt.com") || host.includes("openai.com")) {
-      return "chatgpt";
-    }
+  function conversationId() {
+    return location.hostname + location.pathname;
+  }
 
-    if (host.includes("claude.ai")) {
-      return "claude";
-    }
+  function modelLabel() {
+    const text = norm(document.body ? document.body.innerText || "" : "");
+    const matches = text.match(/\b(GPT-5|GPT-4o|GPT-4|Claude|Gemini|Grok|Perplexity)\b/gi);
+    if (!matches || matches.length === 0) { return "unknown"; }
+    return matches[0];
+  }
 
-    if (host.includes("gemini.google.com")) {
-      return "gemini";
-    }
+  function roleForNode(node) {
+    const attr = node.getAttribute && node.getAttribute("data-message-author-role");
+    if (attr) { return attr; }
 
-    if (host.includes("perplexity.ai")) {
-      return "perplexity";
-    }
-
-    if (host.includes("grok.com") || host.includes("x.ai")) {
-      return "grok";
-    }
+    const text = norm(node.innerText || node.textContent || "");
+    if (text.match(/^(you|user)\b[: ]/i)) { return "user"; }
+    if (text.match(/^(assistant|chatgpt|claude|gemini)\b[: ]/i)) { return "assistant"; }
 
     return "unknown";
   }
 
-  function haaiCollectRecentMessages() {
+  function collectMessages() {
     const selectors = [
       "[data-message-author-role]",
-      "[data-testid]",
-      ".markdown",
-      ".message",
       "article",
-      "main"
+      ".markdown",
+      ".message"
     ];
 
     const seen = new Set();
-    const collected = [];
+    const out = [];
 
     for (const selector of selectors) {
       const nodes = document.querySelectorAll(selector);
 
       for (const node of nodes) {
-        const text = haaiNormalizeText(node.innerText || node.textContent || "");
-
-        if (!text || text.length < 8) {
-          continue;
-        }
-
-        if (seen.has(text)) {
-          continue;
-        }
+        const text = norm(node.innerText || node.textContent || "");
+        if (!text || text.length < 4) { continue; }
+        if (seen.has(text)) { continue; }
 
         seen.add(text);
-        collected.push(text);
-
-        if (collected.length >= 16) {
-          return collected.slice(-16);
-        }
+        out.push({
+          role: roleForNode(node),
+          text: text,
+          length: text.length
+        });
       }
     }
 
-    return collected.slice(-16);
+    return out.slice(-24);
   }
 
-  function haaiFingerprint(messages) {
-    return messages.join("\n---\n").slice(-6000);
+  function fingerprint(messages) {
+    return JSON.stringify(messages).slice(-12000);
   }
 
-  function haaiBuildRecoveryPrompt(messages) {
-    const joined = messages.join("\n\n---\n\n");
-
-    return [
-      "HAAI CONTEXT RECOVERY REQUEST",
-      "",
-      "I started an AI evidence recorder in the middle of this conversation.",
-      "Please reconstruct the current work context from the visible recent conversation evidence.",
-      "",
-      "Return:",
-      "1. What we are working on.",
-      "2. The most recent decisions.",
-      "3. Current blockers or errors.",
-      "4. What should happen next.",
-      "5. A copyable continuation prompt.",
-      "6. Confidence and uncertainty for each major claim.",
-      "",
-      "Detected provider: " + haaiDetectProvider(),
-      "Page title: " + document.title,
-      "Page URL: " + location.href,
-      "",
-      "Visible recent conversation evidence:",
-      joined
-    ].join("\n");
-  }
-
-  function haaiEmitEvent(eventType, payload) {
+  function emit(eventType, payload) {
     chrome.runtime.sendMessage({
       type: "haai_record_event",
       event: {
@@ -116,28 +85,57 @@ if (!window.__HAAI_CONTENT_SCRIPT_LOADED__) {
         event_type: eventType,
         created_utc: new Date().toISOString(),
         source: "content_script",
-        provider: haaiDetectProvider(),
+        provider: provider(),
+        model: modelLabel(),
         page_url: location.href,
         page_title: document.title,
+        conversation_id: conversationId(),
         payload: payload || {}
       }
     });
   }
 
-  function haaiScan() {
-    const messages = haaiCollectRecentMessages();
-    const fingerprint = haaiFingerprint(messages);
+  function scan() {
+    const messages = collectMessages();
+    const fp = fingerprint(messages);
 
-    if (!fingerprint || fingerprint === haaiLastFingerprint) {
+    if (!fp || fp === haaiLastFingerprint) {
       return;
     }
 
-    haaiLastFingerprint = fingerprint;
+    haaiLastFingerprint = fp;
 
-    haaiEmitEvent("conversation_snapshot", {
+    emit("conversation_snapshot", {
       message_count: messages.length,
-      recent_messages: messages
+      messages: messages
     });
+  }
+
+  function recoveryPrompt(messages) {
+    const evidence = messages.map((m) => "[" + m.role + "] " + m.text).join("\n\n---\n\n");
+
+    return [
+      "HAAI CONTEXT RECOVERY REQUEST",
+      "",
+      "Reconstruct the current AI work session from this captured conversation evidence.",
+      "",
+      "Return:",
+      "1. What is being worked on.",
+      "2. Recent user instructions.",
+      "3. Recent assistant actions.",
+      "4. Current blockers or errors.",
+      "5. Likely model/provider context.",
+      "6. Next best action.",
+      "7. Confidence and uncertainty.",
+      "",
+      "Provider: " + provider(),
+      "Model label if visible: " + modelLabel(),
+      "Conversation ID: " + conversationId(),
+      "URL: " + location.href,
+      "",
+      "Evidence:",
+      evidence
+    ].join("\n");
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -147,21 +145,20 @@ if (!window.__HAAI_CONTENT_SCRIPT_LOADED__) {
     }
 
     if (message.type === "haai_build_context_prompt") {
-      const messages = haaiCollectRecentMessages();
-      const prompt = haaiBuildRecoveryPrompt(messages);
-
+      const messages = collectMessages();
       sendResponse({
         ok: true,
-        provider: haaiDetectProvider(),
+        provider: provider(),
+        model: modelLabel(),
+        conversation_id: conversationId(),
         message_count: messages.length,
-        prompt: prompt
+        prompt: recoveryPrompt(messages)
       });
-
       return true;
     }
 
     if (message.type === "haai_force_scan") {
-      haaiScan();
+      scan();
       sendResponse({ ok: true, result: "scan_completed" });
       return true;
     }
@@ -170,10 +167,12 @@ if (!window.__HAAI_CONTENT_SCRIPT_LOADED__) {
     return true;
   });
 
-  haaiEmitEvent("content_script_loaded", {
-    provider: haaiDetectProvider()
+  emit("content_script_loaded", {
+    provider: provider(),
+    model: modelLabel(),
+    conversation_id: conversationId()
   });
 
-  setInterval(haaiScan, 2000);
-  haaiScan();
+  setInterval(scan, 2000);
+  scan();
 }
