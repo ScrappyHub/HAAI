@@ -14,12 +14,22 @@ if (!window.__HAAI_CONTENT_LOADED__) {
     try {
       if (!canSend()) { return; }
       chrome.runtime.sendMessage(message, () => {});
-    } catch (err) {}
+    } catch (_err) {}
   }
 
   function cleanText(value) {
     if (typeof value !== "string") { return ""; }
     return value.replace(/\s+/g, " ").trim();
+  }
+
+  function isNoise(text) {
+    const t = cleanText(text).toLowerCase();
+    if (!t) { return true; }
+    if (t.includes("chatgpt can make mistakes")) { return true; }
+    if (t.includes("see your privacy choices")) { return true; }
+    if (t.includes("sponsored")) { return true; }
+    if (t.includes("create an image write or edit look something up")) { return true; }
+    return false;
   }
 
   function provider() {
@@ -33,31 +43,56 @@ if (!window.__HAAI_CONTENT_LOADED__) {
   }
 
   function inputText() {
-    const el = document.querySelector("textarea") || document.querySelector("[contenteditable='true']") || document.querySelector("div[role='textbox']");
+    const el =
+      document.querySelector("textarea") ||
+      document.querySelector("[contenteditable='true']") ||
+      document.querySelector("div[role='textbox']");
+
     return el ? cleanText(el.value || el.innerText || el.textContent || "") : "";
   }
 
-  function collectMessages() {
-    const selectors = ["[data-message-author-role]", "article", ".markdown", "main"];
+  function chatgptMessages() {
+    const out = [];
+    const nodes = document.querySelectorAll("[data-message-author-role]");
+
+    for (const node of nodes) {
+      const text = cleanText(node.innerText || node.textContent || "");
+      if (!text || text.length < 2 || isNoise(text)) { continue; }
+
+      const role = node.getAttribute("data-message-author-role") || "unknown";
+      out.push({ role: role, text: text, length: text.length });
+    }
+
+    return out.slice(-32);
+  }
+
+  function genericMessages() {
+    const selectors = ["article", ".markdown", ".message"];
     const seen = new Set();
-    const messages = [];
+    const out = [];
 
     for (const selector of selectors) {
       for (const node of document.querySelectorAll(selector)) {
         const text = cleanText(node.innerText || node.textContent || "");
-        if (!text || text.length < 8 || seen.has(text)) { continue; }
+        if (!text || text.length < 8 || isNoise(text) || seen.has(text)) { continue; }
+
         seen.add(text);
+        out.push({ role: "unknown", text: text, length: text.length });
 
-        let role = "unknown";
-        const attr = node.getAttribute && node.getAttribute("data-message-author-role");
-        if (attr) { role = attr; }
-
-        messages.push({ role, text, length: text.length });
-        if (messages.length >= 32) { return messages; }
+        if (out.length >= 32) { return out; }
       }
     }
 
-    return messages;
+    return out;
+  }
+
+  function collectMessages() {
+    if (provider() === "chatgpt") {
+      const exact = chatgptMessages();
+      if (exact.length > 0) { return exact; }
+    }
+
+    return genericMessages();
   }
 
   function surface(messages) {
@@ -80,7 +115,7 @@ if (!window.__HAAI_CONTENT_LOADED__) {
         event_type: eventType,
         created_utc: new Date().toISOString(),
         source: "content_script",
-        payload
+        payload: payload
       }
     });
   }
@@ -100,7 +135,13 @@ if (!window.__HAAI_CONTENT_LOADED__) {
     if (currentInput !== lastInputState) {
       lastInputState = currentInput;
       emit("input_surface_changed", {
-        ...payload,
+        detected: payload.detected,
+        provider: payload.provider,
+        domain: payload.domain,
+        url: payload.url,
+        title: payload.title,
+        message_count: payload.message_count,
+        input_detected: payload.input_detected,
         input_length: currentInput.length,
         input_preview: currentInput.slice(0, 500)
       });

@@ -10,7 +10,7 @@ const output = document.getElementById("output");
 const notice = document.getElementById("notice");
 const capturePill = document.getElementById("capturePill");
 const surfacePill = document.getElementById("surfacePill");
-const humanStatus = document.getElementById("humanStatus");
+const sessionStatus = document.getElementById("sessionStatus");
 
 function say(text) {
   output.value = text;
@@ -49,11 +49,11 @@ function render(state) {
   beginButton.disabled = active;
   stopButton.disabled = !active;
 
-  humanStatus.textContent =
+  sessionStatus.textContent =
     "domain=" + (surface.domain || "-") +
-    " Â· messages=" + (surface.message_count || 0) +
-    " Â· input=" + (surface.input_detected ? "yes" : "no") +
-    " Â· events=" + events;
+    " Ã‚Â| messages=" + (surface.message_count || 0) +
+    " Ã‚Â| input=" + (surface.input_detected ? "yes" : "no") +
+    " Ã‚Â| events=" + events;
 }
 
 function getState(show) {
