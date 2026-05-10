@@ -147,23 +147,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "haai_begin_capture") {
       const now = new Date().toISOString();
 
-      state.active_capture = true;
-      state.session_id = state.session_id || ("session_" + now.replace(/[:.]/g, "-"));
-      state.session_started_utc = state.session_started_utc || now;
-      state.session_stopped_utc = "";
-      state.lifecycle.session_started = true;
-      state.lifecycle.session_stopped = false;
+      const fresh = cloneDefault();
+      fresh.active_capture = true;
+      fresh.session_id = "session_" + now.replace(/[:.]/g, "-");
+      fresh.session_started_utc = now;
+      fresh.lifecycle.session_started = true;
+      fresh.lifecycle.session_stopped = false;
 
-      addEvent(state, makeEvent("session_started", "background", {
-        session_id: state.session_id
+      addEvent(fresh, makeEvent("session_started", "background", {
+        session_id: fresh.session_id
       }));
 
-      await saveState(state);
+      await saveState(fresh);
 
       sendResponse({
         ok: true,
         message: "Capture started.",
-        state: state
+        state: fresh
       });
 
       return;

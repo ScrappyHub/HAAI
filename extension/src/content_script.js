@@ -80,7 +80,13 @@ if (!window.__HAAI_CONTENT_LOADED__) {
         seen.add(text);
         const attr = node.getAttribute && node.getAttribute("data-message-author-role");
         const role = attr || "unknown";
-        if (role === "unknown" && out.some((m) => text.includes(m.text))) { continue; }
+
+        if (role === "unknown") {
+          if (text.includes("ChatGPT can make mistakes")) { continue; }
+          if (out.some((m) => text.includes(m.text) || m.text.includes(text))) { continue; }
+          if (out.some((m) => m.role !== "unknown" && text.indexOf(m.text) >= 0)) { continue; }
+        }
+
         out.push({ role: role, text: text, length: text.length });
 
         if (out.length >= 32) { return out; }
@@ -96,7 +102,12 @@ if (!window.__HAAI_CONTENT_LOADED__) {
       if (exact.length > 0) { return exact; }
     }
 
-    return genericMessages();
+    const generic = genericMessages();
+    return generic.filter((m) => {
+      if (m.role !== "unknown") { return true; }
+      if (m.text.includes("ChatGPT can make mistakes")) { return false; }
+      return !generic.some((x) => x !== m && x.role !== "unknown" && m.text.includes(x.text));
+    });
   }
 
     function conversationId() {

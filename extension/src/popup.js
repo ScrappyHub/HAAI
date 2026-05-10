@@ -198,7 +198,7 @@ stopButton.addEventListener("click", () => {
     }
 
     render(response.state);
-    say("Capture stopped. Session evidence is saved in the extension store. You can export this session with a timestamped hash.");
+    say(formatState(response.state) + "\n\nCapture stopped. Session evidence is saved and ready to export.");
     note("Capture stopped.");
   });
 });
