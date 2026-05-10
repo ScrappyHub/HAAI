@@ -51,9 +51,9 @@ function render(state) {
 
   humanStatus.textContent =
     "domain=" + (surface.domain || "-") +
-    " · messages=" + (surface.message_count || 0) +
-    " · input=" + (surface.input_detected ? "yes" : "no") +
-    " · events=" + events;
+    " Â· messages=" + (surface.message_count || 0) +
+    " Â· input=" + (surface.input_detected ? "yes" : "no") +
+    " Â· events=" + events;
 }
 
 function getState(show) {
@@ -136,7 +136,7 @@ beginButton.addEventListener("click", async () => {
 stopButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_stop_capture" }, (response) => {
     render(response.state);
-    say("Capture stopped. Recorded events remain in memory until extension reload.");
+    say("Capture stopped. Session evidence remains saved in the extension store. Use Export Session to download the captured conversation evidence.");
     note("Capture stopped.");
   });
 });
@@ -179,3 +179,30 @@ copyButton.addEventListener("click", async () => {
 });
 
 getState(false);
+
+const exportButton = document.createElement("button");
+exportButton.textContent = "Export Session";
+exportButton.style.marginTop = "8px";
+exportButton.style.width = "100%";
+document.querySelector(".grid").insertAdjacentElement("afterend", exportButton);
+
+exportButton.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "haai_export_session" }, (response) => {
+    if (!response || !response.ok) {
+      note("Export failed.");
+      return;
+    }
+
+    const blob = new Blob([response.body], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    chrome.downloads.download({
+      url: url,
+      filename: response.filename,
+      saveAs: true
+    });
+
+    say("Export ready.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256);
+    note("Session export ready.");
+  });
+});
