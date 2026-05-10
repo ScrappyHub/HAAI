@@ -10,7 +10,7 @@ const output = document.getElementById("output");
 const notice = document.getElementById("notice");
 const capturePill = document.getElementById("capturePill");
 const surfacePill = document.getElementById("surfacePill");
-const sessionStatus = document.getElementById("sessionStatus");
+const sessionStatus = document.getElementById("humanStatus");
 
 function say(text) {
   output.value = text;
@@ -20,19 +20,39 @@ function note(text) {
   notice.textContent = text;
 }
 
-async function activeTab() {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tabs || !tabs[0] || !tabs[0].id) {
-    throw new Error("No active browser tab found.");
+function safeNumber(value) {
+  if (typeof value === "number") {
+    return value;
   }
-  return tabs[0];
+
+  return 0;
 }
 
-async function inject(tabId) {
-  await chrome.scripting.executeScript({
-    target: { tabId: tabId },
-    files: ["src/content_script.js"]
-  });
+function formatState(state) {
+  const surface = state && state.surface ? state.surface : {};
+  const lifecycle = state && state.lifecycle ? state.lifecycle : {};
+  const events = state && Array.isArray(state.events) ? state.events.length : 0;
+
+  return [
+    "HAAI session summary",
+    "",
+    "Capture: " + (state && state.active_capture ? "running" : "stopped"),
+    "Provider: " + (surface.provider || "unknown"),
+    "Domain: " + (surface.domain || "-"),
+    "Title: " + (surface.title || "-"),
+    "Visible messages: " + safeNumber(surface.message_count),
+    "Input detected: " + (surface.input_detected ? "yes" : "no"),
+    "Recorded events: " + events,
+    "Domain changes: " + safeNumber(lifecycle.domain_changes),
+    "Conversation changes: " + safeNumber(lifecycle.conversation_changes),
+    "Exports: " + safeNumber(lifecycle.exports),
+    "Session started: " + (state && state.session_started_utc ? state.session_started_utc : "-"),
+    "Session stopped: " + (state && state.session_stopped_utc ? state.session_stopped_utc : "-"),
+    "Last activity: " + (state && state.last_activity_utc ? state.last_activity_utc : "-"),
+    "",
+    "Use Probe Page if the current page changed.",
+    "Use Export Session when the conversation is ready to save."
+  ].join("\n");
 }
 
 function render(state) {
@@ -51,36 +71,51 @@ function render(state) {
 
   sessionStatus.textContent =
     "domain=" + (surface.domain || "-") +
-    " Ãƒâ€šÃ‚| messages=" + (surface.message_count || 0) +
-    " Ãƒâ€šÃ‚| input=" + (surface.input_detected ? "yes" : "no") +
-    " Ãƒâ€šÃ‚| events=" + events;
+    " | messages=" + safeNumber(surface.message_count) +
+    " | input=" + (surface.input_detected ? "yes" : "no") +
+    " | events=" + events;
 }
 
-function getState(show) {
+function getState(showSummary) {
+  note("Checking session state...");
+
   chrome.runtime.sendMessage({ type: "haai_get_state" }, (response) => {
+    if (chrome.runtime.lastError) {
+      say("HAAI check failed.\n\n" + chrome.runtime.lastError.message);
+      note("Check failed.");
+      return;
+    }
+
     if (!response || !response.ok) {
-      note("Could not read HAAI state.");
+      say("HAAI check failed. Background state was unavailable.");
+      note("Check failed.");
       return;
     }
 
     render(response.state);
 
-    if (show) {
-      const s = response.state.surface || {};
-      say(
-        "HAAI is " + (response.state.active_capture ? "capturing." : "not capturing.") + "\n\n" +
-        "Detected page: " + (s.detected ? "yes" : "no") + "\n" +
-        "Provider: " + (s.provider || "unknown") + "\n" +
-        "Domain: " + (s.domain || "-") + "\n" +
-        "Visible messages: " + (s.message_count || 0) + "\n" +
-        "Input box detected: " + (s.input_detected ? "yes" : "no") + "\n" +
-        "Recorded events: " + response.state.events.length + "\n" +
-        "Domain changes: " + ((response.state.lifecycle && response.state.lifecycle.domain_changes) || 0) + "\n" +
-        "Conversation changes: " + ((response.state.lifecycle && response.state.lifecycle.conversation_changes) || 0) + "\n" +
-        "Last activity: " + (response.state.last_activity_utc || "-") + "\n\n" +
-        "Use Probe Page to embed HAAI into the current AI page."
-      );
+    if (showSummary) {
+      say(formatState(response.state));
     }
+
+    note("Session state refreshed.");
+  });
+}
+
+async function activeTab() {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  if (!tabs || !tabs[0] || !tabs[0].id) {
+    throw new Error("No active browser tab found.");
+  }
+
+  return tabs[0];
+}
+
+async function inject(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ["src/content_script.js"]
   });
 }
 
@@ -94,6 +129,7 @@ async function probePage() {
         resolve({ ok: false, reason: chrome.runtime.lastError.message });
         return;
       }
+
       resolve(response);
     });
   });
@@ -105,39 +141,62 @@ checkButton.addEventListener("click", () => {
 
 probeButton.addEventListener("click", async () => {
   try {
+    note("Probing current page...");
+
     const response = await probePage();
+
     if (!response || !response.ok) {
-      say("HAAI could not embed into this page.\n\nReason: " + (response ? response.reason : "unknown"));
+      say("HAAI could not attach to this page.\n\nReason: " + (response ? response.reason : "unknown"));
       note("Probe failed.");
       return;
     }
 
     getState(false);
+
     say(
-      "HAAI embedded into this page.\n\n" +
+      "HAAI attached to this page.\n\n" +
       "Provider: " + response.surface.provider + "\n" +
       "Domain: " + response.surface.domain + "\n" +
       "Visible messages: " + response.surface.message_count + "\n" +
       "Input box detected: " + (response.surface.input_detected ? "yes" : "no")
     );
+
     note("Page probe complete.");
   } catch (err) {
     say("Probe failed: " + String(err && err.message ? err.message : err));
+    note("Probe failed.");
   }
 });
 
 beginButton.addEventListener("click", async () => {
-  await probePage();
+  try {
+    await probePage();
 
-  chrome.runtime.sendMessage({ type: "haai_begin_capture" }, (response) => {
-    render(response.state);
-    say("Capture started. HAAI is watching this AI page for message changes, conversation changes, and domain changes.");
-    note("Capture running.");
-  });
+    chrome.runtime.sendMessage({ type: "haai_begin_capture" }, (response) => {
+      if (chrome.runtime.lastError) {
+        say("Capture start failed.\n\n" + chrome.runtime.lastError.message);
+        note("Capture start failed.");
+        return;
+      }
+
+      render(response.state);
+      say("Capture started. HAAI is watching this AI page for message, conversation, and domain changes.");
+      note("Capture running.");
+    });
+  } catch (err) {
+    say("Capture start failed: " + String(err && err.message ? err.message : err));
+    note("Capture start failed.");
+  }
 });
 
 stopButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_stop_capture" }, (response) => {
+    if (chrome.runtime.lastError) {
+      say("Capture stop failed.\n\n" + chrome.runtime.lastError.message);
+      note("Capture stop failed.");
+      return;
+    }
+
     render(response.state);
     say("Capture stopped. Session evidence is saved in the extension store. You can export this session with a timestamped hash.");
     note("Capture stopped.");
@@ -152,6 +211,7 @@ promptButton.addEventListener("click", async () => {
     chrome.tabs.sendMessage(tab.id, { type: "haai_build_context_prompt" }, (response) => {
       if (chrome.runtime.lastError || !response || !response.ok) {
         say("Could not build context prompt. Probe the page first, then try again.");
+        note("Prompt failed.");
         return;
       }
 
@@ -160,11 +220,13 @@ promptButton.addEventListener("click", async () => {
     });
   } catch (err) {
     say("Prompt build failed: " + String(err && err.message ? err.message : err));
+    note("Prompt failed.");
   }
 });
 
 copyButton.addEventListener("click", async () => {
   const value = output.value || "";
+
   if (!value.trim()) {
     note("Nothing to copy.");
     return;
@@ -173,15 +235,13 @@ copyButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(value);
   copyButton.textContent = "Copied Prompt";
   copyButton.disabled = true;
-  note("Prompt copied to clipboard.");
+  note("Copied to clipboard.");
 
   setTimeout(() => {
     copyButton.textContent = "Copy Prompt";
     copyButton.disabled = false;
   }, 1500);
 });
-
-getState(false);
 
 const exportButton = document.createElement("button");
 exportButton.textContent = "Export Session";
@@ -191,7 +251,14 @@ document.querySelector(".grid").insertAdjacentElement("afterend", exportButton);
 
 exportButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_export_session" }, (response) => {
+    if (chrome.runtime.lastError) {
+      say("Export failed.\n\n" + chrome.runtime.lastError.message);
+      note("Export failed.");
+      return;
+    }
+
     if (!response || !response.ok) {
+      say("Export failed. No session export was returned.");
       note("Export failed.");
       return;
     }
@@ -205,7 +272,13 @@ exportButton.addEventListener("click", () => {
       saveAs: true
     });
 
+    if (response.state) {
+      render(response.state);
+    }
+
     say("Export ready.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256);
     note("Session export ready.");
   });
 });
+
+getState(false);

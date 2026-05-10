@@ -67,7 +67,7 @@ if (!window.__HAAI_CONTENT_LOADED__) {
   }
 
   function genericMessages() {
-    const selectors = ["article", ".markdown", ".message"];
+    const selectors = ["[data-message-author-role]", "article", ".markdown", ".message"];
     const seen = new Set();
     const out = [];
 
@@ -75,9 +75,13 @@ if (!window.__HAAI_CONTENT_LOADED__) {
       for (const node of document.querySelectorAll(selector)) {
         const text = cleanText(node.innerText || node.textContent || "");
         if (!text || text.length < 8 || isNoise(text) || seen.has(text)) { continue; }
+        if (selector !== "[data-message-author-role]" && text.includes("ChatGPT can make mistakes")) { continue; }
 
         seen.add(text);
-        out.push({ role: "unknown", text: text, length: text.length });
+        const attr = node.getAttribute && node.getAttribute("data-message-author-role");
+        const role = attr || "unknown";
+        if (role === "unknown" && out.some((m) => text.includes(m.text))) { continue; }
+        out.push({ role: role, text: text, length: text.length });
 
         if (out.length >= 32) { return out; }
       }
