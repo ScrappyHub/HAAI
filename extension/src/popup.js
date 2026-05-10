@@ -223,7 +223,10 @@ stopButton.addEventListener("click", () => {
     }
 
     render(response.state);
-    say(formatState(response.state, []) + "\n\nCapture stopped. Session evidence is saved and ready to export. Click Check to refresh the capture timeline.");
+    chrome.runtime.sendMessage({ type: "haai_get_state" }, (fresh) => {
+      const timeline = fresh && fresh.timeline ? fresh.timeline : [];
+      say(formatState(response.state, timeline) + "\n\nCapture stopped. Session evidence is saved and ready to export.");
+    });
     note("Capture stopped.");
   });
 });
@@ -301,7 +304,10 @@ exportButton.addEventListener("click", () => {
       render(response.state);
     }
 
-    say("Export ready.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256);
+    chrome.runtime.sendMessage({ type: "haai_get_state" }, (fresh) => {
+      const timeline = fresh && fresh.timeline ? fresh.timeline : [];
+      say("Export ready.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256 + "\n\n" + timelineSummary(timeline));
+    });
     note("Session export ready.");
   });
 });

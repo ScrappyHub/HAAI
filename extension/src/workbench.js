@@ -31,6 +31,7 @@ function render(data) {
     " | events=" + (Array.isArray(lastState.events) ? lastState.events.length : 0);
 
   timelineEl.innerHTML = "";
+  details.textContent = "Select a capture to inspect it.";
 
   if (lastTimeline.length === 0) {
     const empty = document.createElement("div");
@@ -76,6 +77,9 @@ function load() {
     }
 
     render(response);
+    if (lastTimeline.length > 0) {
+      details.textContent = JSON.stringify(lastTimeline[lastTimeline.length - 1], null, 2);
+    }
   });
 }
 
