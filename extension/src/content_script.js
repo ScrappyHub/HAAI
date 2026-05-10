@@ -95,6 +95,10 @@ if (!window.__HAAI_CONTENT_LOADED__) {
     return genericMessages();
   }
 
+    function conversationId() {
+    return location.hostname + location.pathname;
+  }
+
   function surface(messages) {
     return {
       detected: provider() !== "unknown" || messages.length > 0 || inputText().length > 0,
@@ -102,6 +106,7 @@ if (!window.__HAAI_CONTENT_LOADED__) {
       domain: location.hostname,
       url: location.href,
       title: document.title || "",
+      conversation_id: conversationId(),
       message_count: messages.length,
       input_detected: inputText().length > 0 || Boolean(document.querySelector("textarea,[contenteditable='true'],div[role='textbox']"))
     };

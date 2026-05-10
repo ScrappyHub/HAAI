@@ -51,9 +51,9 @@ function render(state) {
 
   sessionStatus.textContent =
     "domain=" + (surface.domain || "-") +
-    " Ã‚Â| messages=" + (surface.message_count || 0) +
-    " Ã‚Â| input=" + (surface.input_detected ? "yes" : "no") +
-    " Ã‚Â| events=" + events;
+    " Ãƒâ€šÃ‚| messages=" + (surface.message_count || 0) +
+    " Ãƒâ€šÃ‚| input=" + (surface.input_detected ? "yes" : "no") +
+    " Ãƒâ€šÃ‚| events=" + events;
 }
 
 function getState(show) {
@@ -74,7 +74,10 @@ function getState(show) {
         "Domain: " + (s.domain || "-") + "\n" +
         "Visible messages: " + (s.message_count || 0) + "\n" +
         "Input box detected: " + (s.input_detected ? "yes" : "no") + "\n" +
-        "Recorded events: " + response.state.events.length + "\n\n" +
+        "Recorded events: " + response.state.events.length + "\n" +
+        "Domain changes: " + ((response.state.lifecycle && response.state.lifecycle.domain_changes) || 0) + "\n" +
+        "Conversation changes: " + ((response.state.lifecycle && response.state.lifecycle.conversation_changes) || 0) + "\n" +
+        "Last activity: " + (response.state.last_activity_utc || "-") + "\n\n" +
         "Use Probe Page to embed HAAI into the current AI page."
       );
     }
@@ -128,7 +131,7 @@ beginButton.addEventListener("click", async () => {
 
   chrome.runtime.sendMessage({ type: "haai_begin_capture" }, (response) => {
     render(response.state);
-    say("Capture started. HAAI will now watch this AI page for conversation changes.");
+    say("Capture started. HAAI is watching this AI page for message changes, conversation changes, and domain changes.");
     note("Capture running.");
   });
 });
@@ -136,7 +139,7 @@ beginButton.addEventListener("click", async () => {
 stopButton.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "haai_stop_capture" }, (response) => {
     render(response.state);
-    say("Capture stopped. Session evidence remains saved in the extension store. Use Export Session to download the captured conversation evidence.");
+    say("Capture stopped. Session evidence is saved in the extension store. You can export this session with a timestamped hash.");
     note("Capture stopped.");
   });
 });
