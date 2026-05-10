@@ -21,14 +21,37 @@ function note(text) {
 }
 
 function safeNumber(value) {
-  if (typeof value === "number") {
-    return value;
-  }
-
-  return 0;
+  return typeof value === "number" ? value : 0;
 }
 
-function formatState(state) {
+function timelineSummary(timeline) {
+  const items = Array.isArray(timeline) ? timeline : [];
+  const now = Date.now();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+
+  const week = items.filter((item) => {
+    const t = Date.parse(item.stopped_utc || item.started_utc || "");
+    return Number.isFinite(t) && (now - t) <= weekMs;
+  });
+
+  const recent = items.slice(-5).reverse().map((item) => {
+    const stamp = item.stopped_utc || item.started_utc || "-";
+    const provider = item.provider || "unknown";
+    const title = item.title || item.domain || "Untitled capture";
+    const mark = item.exported ? "exported" : "ready";
+    return "- " + stamp + " | " + provider + " | " + title + " | " + mark;
+  });
+
+  return [
+    "This week captures: " + week.length,
+    "All time captures: " + items.length,
+    "",
+    "Recent captures:",
+    recent.length ? recent.join("\n") : "- No saved captures yet."
+  ].join("\n");
+}
+
+function formatState(state, timeline) {
   const surface = state && state.surface ? state.surface : {};
   const lifecycle = state && state.lifecycle ? state.lifecycle : {};
   const events = state && Array.isArray(state.events) ? state.events.length : 0;
@@ -51,7 +74,9 @@ function formatState(state) {
     "Last activity: " + (state && state.last_activity_utc ? state.last_activity_utc : "-"),
     "",
     "Use Probe Page if the current page changed.",
-    "Use Export Session when the conversation is ready to save."
+    "Use Export Session when the conversation is ready to save.",
+    "",
+    timelineSummary(timeline)
   ].join("\n");
 }
 
@@ -95,7 +120,7 @@ function getState(showSummary) {
     render(response.state);
 
     if (showSummary) {
-      say(formatState(response.state));
+      say(formatState(response.state, response.timeline));
     }
 
     note("Session state refreshed.");
@@ -198,7 +223,7 @@ stopButton.addEventListener("click", () => {
     }
 
     render(response.state);
-    say(formatState(response.state) + "\n\nCapture stopped. Session evidence is saved and ready to export.");
+    say(formatState(response.state, []) + "\n\nCapture stopped. Session evidence is saved and ready to export. Click Check to refresh the capture timeline.");
     note("Capture stopped.");
   });
 });
@@ -282,3 +307,13 @@ exportButton.addEventListener("click", () => {
 });
 
 getState(false);
+
+const workbenchButton = document.createElement("button");
+workbenchButton.textContent = "Open Workbench";
+workbenchButton.style.marginTop = "8px";
+workbenchButton.style.width = "100%";
+document.querySelector(".grid").insertAdjacentElement("afterend", workbenchButton);
+
+workbenchButton.addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/workbench.html") });
+});
