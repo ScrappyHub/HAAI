@@ -36,18 +36,25 @@ function stableStringify(value) {
 
 async function hashEvents(events) {
   const out = [];
+  let previousHash = "GENESIS";
 
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i] || {};
     const canonical = stableStringify(event);
-    const hash = await sha256Hex(canonical);
+    const eventHash = await sha256Hex(canonical);
+    const chainInput = previousHash + "\n" + canonical;
+    const chainHash = await sha256Hex(chainInput);
 
     out.push({
       index: i,
       event_type: event.event_type || "unknown",
       created_utc: event.created_utc || "",
-      event_hash_sha256: hash
+      previous_event_chain_hash_sha256: previousHash,
+      event_hash_sha256: eventHash,
+      event_chain_hash_sha256: chainHash
     });
+
+    previousHash = chainHash;
   }
 
   return out;
@@ -291,6 +298,7 @@ exportReport.addEventListener("click", async () => {
 
   report.event_hashes = await hashEvents(events);
   report.event_hash_count = report.event_hashes.length;
+  report.event_chain_head_sha256 = report.event_hashes.length ? report.event_hashes[report.event_hashes.length - 1].event_chain_hash_sha256 : "GENESIS";
 
   const bodyWithoutReportHash = JSON.stringify(report, null, 2);
   const hash = await sha256Hex(bodyWithoutReportHash);
@@ -308,7 +316,7 @@ exportReport.addEventListener("click", async () => {
 
   downloadText(filename, exportedBody, "application/json");
 
-  details.textContent = "Replay report exported.\n\nFile: " + filename + "\nReport SHA-256: " + finalHash + "\nEvent hashes: " + report.event_hash_count;
+  details.textContent = "Replay report exported.\n\nFile: " + filename + "\nReport SHA-256: " + finalHash + "\nEvent hashes: " + report.event_hash_count + "\nEvent chain head: " + report.event_chain_head_sha256;
 });
 
 refresh.addEventListener("click", load);
