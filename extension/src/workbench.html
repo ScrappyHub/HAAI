@@ -7,22 +7,28 @@
     body { margin: 0; background: #08111f; color: #e5e7eb; font-family: Segoe UI, system-ui, sans-serif; }
     header { padding: 22px 28px; border-bottom: 1px solid #1f2937; background: #0f172a; }
     h1 { margin: 0; font-size: 24px; }
+    h2 { margin-top: 0; }
     .sub { color: #93c5fd; margin-top: 6px; }
-    main { padding: 22px 28px; display: grid; grid-template-columns: 320px 1fr; gap: 18px; }
+    main { padding: 22px 28px; display: grid; grid-template-columns: 330px 1fr; gap: 18px; }
     .card { background: #111827; border: 1px solid #334155; border-radius: 16px; padding: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.25); }
     .stat { font-size: 26px; font-weight: 800; }
     .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     button { border: 0; border-radius: 10px; padding: 10px 12px; background: #38bdf8; color: #020617; font-weight: 800; cursor: pointer; }
     .timeline { display: grid; gap: 10px; }
-    .item { padding: 12px; border: 1px solid #334155; border-radius: 12px; background: #020617; }
+    .item { padding: 12px; border: 1px solid #334155; border-radius: 12px; background: #020617; cursor: pointer; }
+    .item:hover { border-color: #38bdf8; }
     .item strong { color: #bfdbfe; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #020617; border: 1px solid #334155; border-radius: 12px; padding: 12px; min-height: 260px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+    .mini { background: #020617; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
+    .mini strong { display: block; font-size: 22px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #020617; border: 1px solid #334155; border-radius: 12px; padding: 12px; min-height: 220px; }
+    .muted { color: #94a3b8; }
   </style>
 </head>
 <body>
   <header>
     <h1>HAAI Replay & Evidence Workbench</h1>
-    <div class="sub">Local-first AI session evidence timeline.</div>
+    <div class="sub">Local-first AI session evidence timeline and replay inspector.</div>
   </header>
 
   <main>
@@ -42,6 +48,17 @@
     <section class="card">
       <h2>Capture Timeline</h2>
       <div id="timeline" class="timeline"></div>
+      <br>
+
+      <h2>Replay Inspector</h2>
+      <div class="grid">
+        <div class="mini"><span class="label">Events</span><strong id="eventCount">0</strong></div>
+        <div class="mini"><span class="label">Inputs</span><strong id="inputCount">0</strong></div>
+        <div class="mini"><span class="label">Snapshots</span><strong id="snapshotCount">0</strong></div>
+      </div>
+
+      <pre id="replay">Select a capture or refresh the current session.</pre>
+
       <h2>Selected Evidence</h2>
       <pre id="details">Select a capture to inspect it.</pre>
     </section>
