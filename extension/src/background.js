@@ -237,14 +237,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       event.session_id = state.session_id || "";
 
       updateSurfaceAndLifecycle(state, event);
-      addEvent(state, event);
+
+      if (state.active_capture) {
+        addEvent(state, event);
+        await saveState(state);
+
+        sendResponse({
+          ok: true,
+          message: "Event recorded.",
+          state: state
+        });
+
+        return;
+      }
 
       await saveState(state);
 
       sendResponse({
         ok: true,
-        message: "Event recorded.",
+        message: "Surface updated. Capture is stopped, so the event was not appended.",
         state: state
+      });
+
+      return;
+    }
+
+    if (message.type === "haai_export_full_history") {
+      const createdUtc = new Date().toISOString();
+      const timeline = await loadTimeline();
+
+      const body = JSON.stringify({
+        schema: "haai.full_history_export.v1",
+        created_utc: createdUtc,
+        capture_count: timeline.length,
+        timeline: timeline
+      }, null, 2);
+
+      const hash = await sha256Hex(body);
+
+      sendResponse({
+        ok: true,
+        message: "Full history export ready.",
+        sha256: hash,
+        filename: "haai_full_history_" + createdUtc.replace(/[:.]/g, "-") + "_" + hash.slice(0, 16) + ".json",
+        body: body
       });
 
       return;

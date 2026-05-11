@@ -11,6 +11,7 @@ const inputCount = document.getElementById("inputCount");
 const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
 const exportReport = document.getElementById("exportReport");
+const exportHistory = document.getElementById("exportHistory");
 const verifyReplay = document.getElementById("verifyReplay");
 
 let lastState = null;
@@ -342,6 +343,23 @@ function load() {
     render(response);
   });
 }
+
+exportHistory.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "haai_export_full_history" }, (response) => {
+    if (chrome.runtime.lastError) {
+      details.textContent = "Full history export failed: " + chrome.runtime.lastError.message;
+      return;
+    }
+
+    if (!response || !response.ok) {
+      details.textContent = "Full history export failed.";
+      return;
+    }
+
+    downloadText(response.filename, response.body, "application/json");
+    details.textContent = "Full history exported.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256;
+  });
+});
 
 verifyReplay.addEventListener("click", async () => {
   const result = await verifyCurrentReplay(lastState || {});
