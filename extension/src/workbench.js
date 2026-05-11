@@ -11,6 +11,7 @@ const inputCount = document.getElementById("inputCount");
 const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
 const exportReport = document.getElementById("exportReport");
+const verifyReplay = document.getElementById("verifyReplay");
 
 let lastState = null;
 let lastTimeline = [];
@@ -182,6 +183,56 @@ function replayReportObject(state, timeline) {
   };
 }
 
+async function verifyCurrentReplay(state) {
+  const events = state && Array.isArray(state.events) ? state.events : [];
+  const hashes = await hashEvents(events);
+  const chainHead = hashes.length ? hashes[hashes.length - 1].event_chain_hash_sha256 : "GENESIS";
+
+  const failures = [];
+
+  if (events.length !== hashes.length) {
+    failures.push("EVENT_HASH_COUNT_MISMATCH");
+  }
+
+  for (let i = 0; i < hashes.length; i += 1) {
+    const row = hashes[i];
+
+    if (row.index !== i) {
+      failures.push("BAD_INDEX_AT_" + i);
+    }
+
+    if (i === 0 && row.previous_event_chain_hash_sha256 !== "GENESIS") {
+      failures.push("BAD_GENESIS_PREVIOUS_HASH");
+    }
+
+    if (i > 0 && row.previous_event_chain_hash_sha256 !== hashes[i - 1].event_chain_hash_sha256) {
+      failures.push("CHAIN_LINK_MISMATCH_AT_" + i);
+    }
+
+    if (!row.event_hash_sha256 || row.event_hash_sha256.length !== 64) {
+      failures.push("BAD_EVENT_HASH_AT_" + i);
+    }
+
+    if (!row.event_chain_hash_sha256 || row.event_chain_hash_sha256.length !== 64) {
+      failures.push("BAD_CHAIN_HASH_AT_" + i);
+    }
+  }
+
+  return {
+    schema: "haai.replay_verify.v1",
+    created_utc: new Date().toISOString(),
+    ok: failures.length === 0,
+    failure_count: failures.length,
+    failures: failures,
+    session_id: state.session_id || "",
+    event_count: events.length,
+    event_hash_count: hashes.length,
+    event_chain_head_sha256: chainHead,
+    first_event_type: events.length && events[0] ? (events[0].event_type || "unknown") : "",
+    last_event_type: events.length && events[events.length - 1] ? (events[events.length - 1].event_type || "unknown") : ""
+  };
+}
+
 function buildReplayText(state) {
   const events = state && Array.isArray(state.events) ? state.events : [];
   const surface = state && state.surface ? state.surface : {};
@@ -291,6 +342,17 @@ function load() {
     render(response);
   });
 }
+
+verifyReplay.addEventListener("click", async () => {
+  const result = await verifyCurrentReplay(lastState || {});
+  details.textContent = JSON.stringify(result, null, 2);
+
+  if (result.ok) {
+    replay.textContent = buildReplayText(lastState || {}) + "\n\nVERIFY CURRENT REPLAY: PASS\nEVENT CHAIN HEAD: " + result.event_chain_head_sha256;
+  } else {
+    replay.textContent = buildReplayText(lastState || {}) + "\n\nVERIFY CURRENT REPLAY: FAIL\nFAILURES: " + result.failures.join(", ");
+  }
+});
 
 exportReport.addEventListener("click", async () => {
   const report = replayReportObject(lastState || {}, lastTimeline || []);
