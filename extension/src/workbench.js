@@ -21,6 +21,38 @@ async function sha256Hex(text) {
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return "[" + value.map((item) => stableStringify(item)).join(",") + "]";
+  }
+
+  const keys = Object.keys(value).sort();
+  return "{" + keys.map((key) => JSON.stringify(key) + ":" + stableStringify(value[key])).join(",") + "}";
+}
+
+async function hashEvents(events) {
+  const out = [];
+
+  for (let i = 0; i < events.length; i += 1) {
+    const event = events[i] || {};
+    const canonical = stableStringify(event);
+    const hash = await sha256Hex(canonical);
+
+    out.push({
+      index: i,
+      event_type: event.event_type || "unknown",
+      created_utc: event.created_utc || "",
+      event_hash_sha256: hash
+    });
+  }
+
+  return out;
+}
+
 function downloadText(filename, body, mimeType) {
   const blob = new Blob([body], { type: mimeType || "application/json" });
   const url = URL.createObjectURL(blob);
@@ -255,17 +287,28 @@ function load() {
 
 exportReport.addEventListener("click", async () => {
   const report = replayReportObject(lastState || {}, lastTimeline || []);
-  const body = JSON.stringify(report, null, 2);
-  const hash = await sha256Hex(body);
-  const stamp = report.created_utc.replace(/[:.]/g, "-");
-  const filename = "haai_replay_report_" + stamp + "_" + hash.slice(0, 16) + ".json";
+  const events = lastState && Array.isArray(lastState.events) ? lastState.events : [];
+
+  report.event_hashes = await hashEvents(events);
+  report.event_hash_count = report.event_hashes.length;
+
+  const bodyWithoutReportHash = JSON.stringify(report, null, 2);
+  const hash = await sha256Hex(bodyWithoutReportHash);
 
   report.report_sha256 = hash;
+
   const finalBody = JSON.stringify(report, null, 2);
+  const finalHash = await sha256Hex(finalBody);
 
-  downloadText(filename, finalBody, "application/json");
+  report.final_report_sha256 = finalHash;
 
-  details.textContent = "Replay report exported.\n\nFile: " + filename + "\nSHA-256: " + hash;
+  const exportedBody = JSON.stringify(report, null, 2);
+  const stamp = report.created_utc.replace(/[:.]/g, "-");
+  const filename = "haai_replay_report_" + stamp + "_" + finalHash.slice(0, 16) + ".json";
+
+  downloadText(filename, exportedBody, "application/json");
+
+  details.textContent = "Replay report exported.\n\nFile: " + filename + "\nReport SHA-256: " + finalHash + "\nEvent hashes: " + report.event_hash_count;
 });
 
 refresh.addEventListener("click", load);
