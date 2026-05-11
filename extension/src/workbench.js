@@ -10,9 +10,27 @@ const eventCount = document.getElementById("eventCount");
 const inputCount = document.getElementById("inputCount");
 const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
+const exportReport = document.getElementById("exportReport");
 
 let lastState = null;
 let lastTimeline = [];
+
+async function sha256Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function downloadText(filename, body, mimeType) {
+  const blob = new Blob([body], { type: mimeType || "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  chrome.downloads.download({
+    url: url,
+    filename: filename,
+    saveAs: true
+  });
+}
 
 function withinWeek(item) {
   const t = Date.parse(item.stopped_utc || item.started_utc || "");
@@ -84,6 +102,45 @@ function snapshotSummary(event) {
   });
 
   return lines.join("\n");
+}
+
+function latestInputPreview(events) {
+  const inputs = events.filter((event) => event && event.event_type === "input_surface_changed");
+  if (inputs.length === 0) { return ""; }
+  const last = inputs[inputs.length - 1];
+  return last && last.payload ? (last.payload.input_preview || "") : "";
+}
+
+function replayReportObject(state, timeline) {
+  const events = state && Array.isArray(state.events) ? state.events : [];
+  const surface = state && state.surface ? state.surface : {};
+  const lifecycle = state && state.lifecycle ? state.lifecycle : {};
+  const lastSnapshot = latestEvent(events, "conversation_snapshot");
+
+  return {
+    schema: "haai.replay_report.v1",
+    created_utc: new Date().toISOString(),
+    session_id: state.session_id || "",
+    capture_state: state.active_capture ? "running" : "stopped",
+    provider: surface.provider || "unknown",
+    domain: surface.domain || "",
+    title: surface.title || "",
+    url: surface.url || "",
+    session_started_utc: state.session_started_utc || "",
+    session_stopped_utc: state.session_stopped_utc || "",
+    last_activity_utc: state.last_activity_utc || "",
+    event_count: events.length,
+    input_event_count: countEvents(events, "input_surface_changed"),
+    snapshot_event_count: countEvents(events, "conversation_snapshot"),
+    domain_changes: lifecycle.domain_changes || 0,
+    conversation_changes: lifecycle.conversation_changes || 0,
+    exports: lifecycle.exports || 0,
+    latest_input_preview: latestInputPreview(events),
+    latest_snapshot_summary: snapshotSummary(lastSnapshot),
+    event_type_counts: eventTypeCounts(events),
+    timeline_count: Array.isArray(timeline) ? timeline.length : 0,
+    timeline_recent: Array.isArray(timeline) ? timeline.slice(-5) : []
+  };
 }
 
 function buildReplayText(state) {
@@ -195,6 +252,21 @@ function load() {
     render(response);
   });
 }
+
+exportReport.addEventListener("click", async () => {
+  const report = replayReportObject(lastState || {}, lastTimeline || []);
+  const body = JSON.stringify(report, null, 2);
+  const hash = await sha256Hex(body);
+  const stamp = report.created_utc.replace(/[:.]/g, "-");
+  const filename = "haai_replay_report_" + stamp + "_" + hash.slice(0, 16) + ".json";
+
+  report.report_sha256 = hash;
+  const finalBody = JSON.stringify(report, null, 2);
+
+  downloadText(filename, finalBody, "application/json");
+
+  details.textContent = "Replay report exported.\n\nFile: " + filename + "\nSHA-256: " + hash;
+});
 
 refresh.addEventListener("click", load);
 load();
