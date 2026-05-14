@@ -16,6 +16,7 @@ const verifyReplay = document.getElementById("verifyReplay");
 
 let lastState = null;
 let lastTimeline = [];
+let lastArchive = [];
 
 async function sha256Hex(text) {
   const bytes = new TextEncoder().encode(text);
@@ -71,6 +72,32 @@ function downloadText(filename, body, mimeType) {
     filename: filename,
     saveAs: true
   });
+}
+
+function replayStateFromArchive(replay) {
+  if (!replay) {
+    return null;
+  }
+
+  return {
+    active_capture: false,
+    session_id: replay.session_id || "",
+    session_started_utc: replay.session_started_utc || "",
+    session_stopped_utc: replay.session_stopped_utc || "",
+    last_activity_utc: replay.session_stopped_utc || replay.frozen_utc || "",
+    surface: replay.surface || {},
+    lifecycle: replay.lifecycle || {},
+    events: Array.isArray(replay.events) ? replay.events : []
+  };
+}
+
+function findArchiveReplay(sessionId) {
+  for (let i = lastArchive.length - 1; i >= 0; i -= 1) {
+    if (lastArchive[i] && lastArchive[i].session_id === sessionId) {
+      return lastArchive[i];
+    }
+  }
+  return null;
 }
 
 function withinWeek(item) {
@@ -278,6 +305,7 @@ function buildReplayText(state) {
 function render(data) {
   lastState = data.state || {};
   lastTimeline = Array.isArray(data.timeline) ? data.timeline : [];
+  lastArchive = Array.isArray(data.archive) ? data.archive : [];
 
   weekCount.textContent = String(lastTimeline.filter(withinWeek).length);
   allCount.textContent = String(lastTimeline.length);
@@ -317,14 +345,29 @@ function render(data) {
       (item.stopped_utc || item.started_utc || "-");
 
     div.addEventListener("click", () => {
-      details.textContent = JSON.stringify(item, null, 2);
+      const replayObj = findArchiveReplay(item.session_id);
+      const frozenState = replayStateFromArchive(replayObj);
+
+      details.textContent = JSON.stringify({
+        timeline: item,
+        frozen_replay_available: Boolean(replayObj),
+        frozen_event_count: replayObj && Array.isArray(replayObj.events) ? replayObj.events.length : 0
+      }, null, 2);
+
+      if (frozenState) {
+        replay.textContent = buildReplayText(frozenState);
+      } else {
+        replay.textContent = "No frozen replay archive found for this capture yet.";
+      }
     });
 
     timelineEl.appendChild(div);
   });
 
   if (lastTimeline.length > 0) {
-    details.textContent = JSON.stringify(lastTimeline[lastTimeline.length - 1], null, 2);
+    const latest = lastTimeline[lastTimeline.length - 1];
+    const latestReplay = findArchiveReplay(latest.session_id);
+    details.textContent = JSON.stringify({ timeline: latest, frozen_replay_available: Boolean(latestReplay) }, null, 2);
   }
 }
 
