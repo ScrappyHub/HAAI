@@ -11,12 +11,14 @@ const inputCount = document.getElementById("inputCount");
 const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
 const exportReport = document.getElementById("exportReport");
+const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
 const verifyReplay = document.getElementById("verifyReplay");
 
 let lastState = null;
 let lastTimeline = [];
 let lastArchive = [];
+let compareSelection = [];
 
 async function sha256Hex(text) {
   const bytes = new TextEncoder().encode(text);
@@ -170,6 +172,94 @@ function snapshotSummary(event) {
   });
 
   return lines.join("\n");
+}
+
+function comparableMessages(events) {
+  return (events || []).filter((event) => {
+    return event &&
+      event.event_type === "conversation_snapshot" &&
+      event.payload &&
+      Array.isArray(event.payload.messages);
+  });
+}
+
+function flattenReplayMessages(replay) {
+  const rows = [];
+  const snapshots = comparableMessages(replay && replay.events ? replay.events : []);
+
+  snapshots.forEach((snapshot) => {
+    (snapshot.payload.messages || []).forEach((msg) => {
+      rows.push({
+        role: msg.role || "unknown",
+        text: (msg.text || "").trim()
+      });
+    });
+  });
+
+  return rows;
+}
+
+function uniqueTexts(rows) {
+  const seen = {};
+  const out = [];
+
+  rows.forEach((row) => {
+    const text = (row.text || "").trim();
+
+    if (!text) {
+      return;
+    }
+
+    if (!seen[text]) {
+      seen[text] = true;
+      out.push(text);
+    }
+  });
+
+  return out;
+}
+
+function compareReplayObjects(a, b) {
+  const aRows = flattenReplayMessages(a);
+  const bRows = flattenReplayMessages(b);
+
+  const aTexts = uniqueTexts(aRows);
+  const bTexts = uniqueTexts(bRows);
+
+  const onlyA = aTexts.filter((x) => !bTexts.includes(x));
+  const onlyB = bTexts.filter((x) => !aTexts.includes(x));
+
+  const overlap = aTexts.filter((x) => bTexts.includes(x));
+
+  const overlapRatio =
+    (aTexts.length + bTexts.length) === 0
+      ? 1
+      : (overlap.length * 2) / (aTexts.length + bTexts.length);
+
+  return {
+    schema: "haai.replay_diff.v1",
+    created_utc: new Date().toISOString(),
+
+    left_session_id: a && a.session_id ? a.session_id : "",
+    right_session_id: b && b.session_id ? b.session_id : "",
+
+    left_provider: a && a.surface ? (a.surface.provider || "") : "",
+    right_provider: b && b.surface ? (b.surface.provider || "") : "",
+
+    left_message_count: aRows.length,
+    right_message_count: bRows.length,
+
+    overlap_count: overlap.length,
+    left_only_count: onlyA.length,
+    right_only_count: onlyB.length,
+
+    stability_ratio: overlapRatio,
+
+    left_only_examples: onlyA.slice(0, 10),
+    right_only_examples: onlyB.slice(0, 10),
+
+    overlap_examples: overlap.slice(0, 10)
+  };
 }
 
 function latestInputPreview(events) {
@@ -348,10 +438,19 @@ function render(data) {
       const replayObj = findArchiveReplay(item.session_id);
       const frozenState = replayStateFromArchive(replayObj);
 
+      if (replayObj) {
+        compareSelection.push(replayObj);
+
+        if (compareSelection.length > 2) {
+          compareSelection = compareSelection.slice(-2);
+        }
+      }
+
       details.textContent = JSON.stringify({
         timeline: item,
         frozen_replay_available: Boolean(replayObj),
-        frozen_event_count: replayObj && Array.isArray(replayObj.events) ? replayObj.events.length : 0
+        frozen_event_count: replayObj && Array.isArray(replayObj.events) ? replayObj.events.length : 0,
+        compare_selection_size: compareSelection.length
       }, null, 2);
 
       if (frozenState) {
@@ -402,6 +501,30 @@ exportHistory.addEventListener("click", () => {
     downloadText(response.filename, response.body, "application/json");
     details.textContent = "Full history exported.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256;
   });
+});
+
+compareReplay.addEventListener("click", async () => {
+
+  if (compareSelection.length < 2) {
+    details.textContent = "Select two replay captures from the timeline first.";
+    return;
+  }
+
+  const left = compareSelection[compareSelection.length - 2];
+  const right = compareSelection[compareSelection.length - 1];
+
+  const diff = compareReplayObjects(left, right);
+
+  details.textContent = JSON.stringify(diff, null, 2);
+
+  replay.textContent =
+    "Replay Comparison\n\n" +
+    "Left Provider: " + diff.left_provider + "\n" +
+    "Right Provider: " + diff.right_provider + "\n\n" +
+    "Overlap Count: " + diff.overlap_count + "\n" +
+    "Left Only: " + diff.left_only_count + "\n" +
+    "Right Only: " + diff.right_only_count + "\n" +
+    "Stability Ratio: " + diff.stability_ratio;
 });
 
 verifyReplay.addEventListener("click", async () => {
