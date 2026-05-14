@@ -2,6 +2,7 @@
 
 const HAAI_KEY = "haai_state_v1";
 const HAAI_TIMELINE_KEY = "haai_capture_timeline_v1";
+const HAAI_ARCHIVE_KEY = "haai_replay_archive_v1";
 
 const DEFAULT_STATE = {
   extension_version: "0.1.0",
@@ -40,9 +41,9 @@ async function loadState() {
   const data = await chrome.storage.local.get(HAAI_KEY);
   const state = data[HAAI_KEY] || cloneDefault();
 
-  if (!state.lifecycle) {
-    state.lifecycle = cloneDefault().lifecycle;
-  }
+  if (!Array.isArray(state.events)) { state.events = []; }
+  if (!state.surface) { state.surface = cloneDefault().surface; }
+  if (!state.lifecycle) { state.lifecycle = cloneDefault().lifecycle; }
 
   return state;
 }
@@ -51,13 +52,22 @@ async function saveState(state) {
   await chrome.storage.local.set({ [HAAI_KEY]: state });
 }
 
-function addEvent(state, event) {
-  state.events.push(event);
-  state.last_activity_utc = event.created_utc || new Date().toISOString();
+async function loadTimeline() {
+  const data = await chrome.storage.local.get(HAAI_TIMELINE_KEY);
+  return Array.isArray(data[HAAI_TIMELINE_KEY]) ? data[HAAI_TIMELINE_KEY] : [];
+}
 
-  if (state.events.length > 2000) {
-    state.events = state.events.slice(-2000);
-  }
+async function saveTimeline(items) {
+  await chrome.storage.local.set({ [HAAI_TIMELINE_KEY]: items.slice(-200) });
+}
+
+async function loadArchive() {
+  const data = await chrome.storage.local.get(HAAI_ARCHIVE_KEY);
+  return Array.isArray(data[HAAI_ARCHIVE_KEY]) ? data[HAAI_ARCHIVE_KEY] : [];
+}
+
+async function saveArchive(items) {
+  await chrome.storage.local.set({ [HAAI_ARCHIVE_KEY]: items.slice(-50) });
 }
 
 function makeEvent(type, source, extra) {
@@ -69,10 +79,18 @@ function makeEvent(type, source, extra) {
   }, extra || {});
 }
 
-function updateSurfaceAndLifecycle(state, event) {
-  if (!event || !event.payload) {
-    return;
+function addEvent(state, event) {
+  if (!Array.isArray(state.events)) { state.events = []; }
+  state.events.push(event);
+  state.last_activity_utc = event.created_utc || new Date().toISOString();
+
+  if (state.events.length > 2000) {
+    state.events = state.events.slice(-2000);
   }
+}
+
+function updateSurfaceAndLifecycle(state, event) {
+  if (!event || !event.payload) { return; }
 
   const payload = event.payload;
 
@@ -89,7 +107,6 @@ function updateSurfaceAndLifecycle(state, event) {
 
   if (newDomain && state.current_domain && newDomain !== state.current_domain) {
     state.lifecycle.domain_changes += 1;
-
     addEvent(state, makeEvent("domain_changed", "background", {
       from_domain: state.current_domain,
       to_domain: newDomain,
@@ -99,7 +116,6 @@ function updateSurfaceAndLifecycle(state, event) {
 
   if (newConversation && state.current_conversation_id && newConversation !== state.current_conversation_id) {
     state.lifecycle.conversation_changes += 1;
-
     addEvent(state, makeEvent("conversation_changed", "background", {
       from_conversation_id: state.current_conversation_id,
       to_conversation_id: newConversation,
@@ -107,13 +123,8 @@ function updateSurfaceAndLifecycle(state, event) {
     }));
   }
 
-  if (newDomain) {
-    state.current_domain = newDomain;
-  }
-
-  if (newConversation) {
-    state.current_conversation_id = newConversation;
-  }
+  if (newDomain) { state.current_domain = newDomain; }
+  if (newConversation) { state.current_conversation_id = newConversation; }
 
   state.surface.detected = Boolean(payload.detected);
   state.surface.provider = payload.provider || "unknown";
@@ -125,14 +136,39 @@ function updateSurfaceAndLifecycle(state, event) {
   state.surface.last_seen_utc = event.created_utc || "";
 }
 
-
-async function loadTimeline() {
-  const data = await chrome.storage.local.get(HAAI_TIMELINE_KEY);
-  return Array.isArray(data[HAAI_TIMELINE_KEY]) ? data[HAAI_TIMELINE_KEY] : [];
+function frozenReplayFromState(state) {
+  return JSON.parse(JSON.stringify({
+    schema: "haai.frozen_replay.v1",
+    frozen_utc: new Date().toISOString(),
+    session_id: state.session_id || "",
+    session_started_utc: state.session_started_utc || "",
+    session_stopped_utc: state.session_stopped_utc || "",
+    surface: state.surface || {},
+    lifecycle: state.lifecycle || {},
+    event_count: Array.isArray(state.events) ? state.events.length : 0,
+    events: Array.isArray(state.events) ? state.events : []
+  }));
 }
 
-async function saveTimeline(items) {
-  await chrome.storage.local.set({ [HAAI_TIMELINE_KEY]: items.slice(-200) });
+async function upsertFrozenReplay(state) {
+  if (!state || !state.session_id) { return; }
+
+  const archive = await loadArchive();
+  const filtered = archive.filter((item) => item.session_id !== state.session_id);
+  filtered.push(frozenReplayFromState(state));
+  await saveArchive(filtered);
+}
+
+async function findFrozenReplay(sessionId) {
+  const archive = await loadArchive();
+
+  for (let i = archive.length - 1; i >= 0; i -= 1) {
+    if (archive[i] && archive[i].session_id === sessionId) {
+      return archive[i];
+    }
+  }
+
+  return null;
 }
 
 async function appendTimelineItem(item) {
@@ -159,10 +195,25 @@ function timelineItemFromState(state, exported, hash, exportedUtc) {
     exported_utc: exportedUtc || ""
   };
 }
+
 async function sha256Hex(text) {
   const bytes = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function exportEnvelopeFromReplay(replay, createdUtc) {
+  return {
+    schema: "haai.extension_session_export.v1",
+    created_utc: createdUtc,
+    session_id: replay.session_id,
+    session_started_utc: replay.session_started_utc,
+    session_stopped_utc: replay.session_stopped_utc,
+    surface: replay.surface,
+    lifecycle: replay.lifecycle,
+    event_count: Array.isArray(replay.events) ? replay.events.length : 0,
+    events: Array.isArray(replay.events) ? replay.events : []
+  };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -175,41 +226,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const state = await loadState();
 
     if (message.type === "haai_get_state") {
-      sendResponse({ ok: true, state: state, timeline: await loadTimeline() });
+      sendResponse({ ok: true, state: state, timeline: await loadTimeline(), archive: await loadArchive() });
       return;
     }
 
     if (message.type === "haai_get_workbench_data") {
-      sendResponse({ ok: true, state: state, timeline: await loadTimeline() });
+      sendResponse({ ok: true, state: state, timeline: await loadTimeline(), archive: await loadArchive() });
+      return;
+    }
+
+    if (message.type === "haai_get_replay_archive") {
+      const sessionId = message.session_id || "";
+      const replay = await findFrozenReplay(sessionId);
+      sendResponse({ ok: Boolean(replay), replay: replay, reason: replay ? "" : "REPLAY_NOT_FOUND" });
       return;
     }
 
     if (message.type === "haai_begin_capture") {
       const now = new Date().toISOString();
+      const fresh = cloneDefault();
 
-      state.active_capture = true;
-      state.session_id = state.session_id || ("session_" + now.replace(/[:.]/g, "-"));
-      state.session_started_utc = state.session_started_utc || now;
-      state.session_stopped_utc = "";
-      state.lifecycle.session_started = true;
-      state.lifecycle.session_stopped = false;
+      fresh.active_capture = true;
+      fresh.session_id = "session_" + now.replace(/[:.]/g, "-");
+      fresh.session_started_utc = now;
+      fresh.session_stopped_utc = "";
+      fresh.lifecycle.session_started = true;
+      fresh.lifecycle.session_stopped = false;
 
-      addEvent(state, makeEvent("session_started", "background", {
-        session_id: state.session_id
+      addEvent(fresh, makeEvent("session_started", "background", {
+        session_id: fresh.session_id
       }));
 
-      await saveState(state);
+      await saveState(fresh);
 
       sendResponse({
         ok: true,
-        message: "Capture started.",
-        state: state
+        message: "Capture started with a fresh session.",
+        state: fresh
       });
 
       return;
     }
 
     if (message.type === "haai_stop_capture") {
+      if (!state.active_capture) {
+        sendResponse({
+          ok: true,
+          message: "Capture already stopped.",
+          state: state
+        });
+        return;
+      }
+
       const now = new Date().toISOString();
 
       state.active_capture = false;
@@ -221,11 +289,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }));
 
       await saveState(state);
+      await upsertFrozenReplay(state);
       await appendTimelineItem(timelineItemFromState(state, false, "", ""));
 
       sendResponse({
         ok: true,
-        message: "Capture stopped.",
+        message: "Capture stopped and frozen replay archived.",
         state: state
       });
 
@@ -233,29 +302,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === "haai_record_event") {
+      if (!state.active_capture) {
+        sendResponse({
+          ok: true,
+          message: "Capture is stopped. Event ignored and frozen evidence was not changed.",
+          state: state
+        });
+        return;
+      }
+
       const event = message.event || {};
       event.session_id = state.session_id || "";
 
       updateSurfaceAndLifecycle(state, event);
-
-      if (state.active_capture) {
-        addEvent(state, event);
-        await saveState(state);
-
-        sendResponse({
-          ok: true,
-          message: "Event recorded.",
-          state: state
-        });
-
-        return;
-      }
+      addEvent(state, event);
 
       await saveState(state);
 
       sendResponse({
         ok: true,
-        message: "Surface updated. Capture is stopped, so the event was not appended.",
+        message: "Event recorded.",
         state: state
       });
 
@@ -265,12 +331,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "haai_export_full_history") {
       const createdUtc = new Date().toISOString();
       const timeline = await loadTimeline();
+      const archive = await loadArchive();
 
       const body = JSON.stringify({
         schema: "haai.full_history_export.v1",
         created_utc: createdUtc,
         capture_count: timeline.length,
-        timeline: timeline
+        frozen_replay_count: archive.length,
+        timeline: timeline,
+        archive: archive
       }, null, 2);
 
       const hash = await sha256Hex(body);
@@ -289,34 +358,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "haai_export_session") {
       const createdUtc = new Date().toISOString();
 
-      const envelope = {
-        schema: "haai.extension_session_export.v1",
-        created_utc: createdUtc,
-        session_id: state.session_id,
-        session_started_utc: state.session_started_utc,
-        session_stopped_utc: state.session_stopped_utc,
-        surface: state.surface,
-        lifecycle: state.lifecycle,
-        event_count: state.events.length,
-        events: state.events
-      };
+      let replay = await findFrozenReplay(state.session_id);
 
-      const body = JSON.stringify(envelope, null, 2);
+      if (!replay && state.session_id) {
+        await upsertFrozenReplay(state);
+        replay = await findFrozenReplay(state.session_id);
+      }
+
+      if (!replay) {
+        replay = frozenReplayFromState(state);
+      }
+
+      const body = JSON.stringify(exportEnvelopeFromReplay(replay, createdUtc), null, 2);
       const hash = await sha256Hex(body);
 
-      state.lifecycle.exports += 1;
+      const timelineItem = timelineItemFromState(state, true, hash, createdUtc);
+      timelineItem.event_count = replay.event_count || 0;
+      timelineItem.stopped_utc = replay.session_stopped_utc || state.session_stopped_utc || "";
+      timelineItem.last_activity_utc = replay.session_stopped_utc || state.last_activity_utc || "";
 
-      addEvent(state, makeEvent("session_exported", "background", {
-        session_id: state.session_id,
-        sha256: hash
-      }));
-
-      await saveState(state);
-      await appendTimelineItem(timelineItemFromState(state, true, hash, createdUtc));
+      await appendTimelineItem(timelineItem);
 
       sendResponse({
         ok: true,
-        message: "Session export ready.",
+        message: "Session export ready from frozen replay.",
         sha256: hash,
         filename: "haai_session_" + createdUtc.replace(/[:.]/g, "-") + "_" + hash.slice(0, 16) + ".json",
         body: body,
