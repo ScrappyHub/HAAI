@@ -32,7 +32,29 @@ if (!window.__HAAI_CONTENT_LOADED__) {
     return false;
   }
 
-  function provider() {
+  function googleAiProviderName() {
+  const host = location.hostname.toLowerCase();
+
+  if (host.includes("gemini.google.com")) {
+    return "gemini";
+  }
+
+  if (host.includes("aistudio.google.com")) {
+    return "google-ai-studio";
+  }
+
+  if (host.includes("bard.google.com")) {
+    return "gemini";
+  }
+
+  if (host.includes("google.com") && location.pathname.toLowerCase().includes("/search")) {
+    return "google-ai-overview";
+  }
+
+  return "";
+}
+
+function provider() {
     const d = location.hostname.toLowerCase();
     if (d.includes("chatgpt.com") || d.includes("openai.com")) { return "chatgpt"; }
     if (d.includes("claude.ai")) { return "claude"; }
@@ -66,7 +88,111 @@ if (!window.__HAAI_CONTENT_LOADED__) {
     return out.slice(-32);
   }
 
-  function genericMessages() {
+  function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function geminiMessages() {
+  const selectors = [
+    "message-content",
+    "div[data-test-id*='conversation-turn']",
+    "div[class*='conversation-turn']",
+    "div[class*='model-response']",
+    "div[class*='query-text']",
+    "div.markdown",
+    "user-query",
+    "model-response"
+  ];
+
+  const nodes = [];
+
+  selectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      if (node && node.innerText) {
+        nodes.push(node);
+      }
+    });
+  });
+
+  const seen = {};
+  const out = [];
+
+  nodes.forEach((node) => {
+    const text = cleanText(node.innerText);
+
+    if (!text || text.length < 2) {
+      return;
+    }
+
+    if (seen[text]) {
+      return;
+    }
+
+    seen[text] = true;
+
+    const joined = [
+      node.getAttribute("data-test-id") || "",
+      node.getAttribute("class") || "",
+      node.tagName || ""
+    ].join(" ").toLowerCase();
+
+    let role = "unknown";
+
+    if (joined.includes("user") || joined.includes("query")) {
+      role = "user";
+    }
+
+    if (joined.includes("model") || joined.includes("response") || joined.includes("markdown")) {
+      role = "assistant";
+    }
+
+    out.push({
+      role: role,
+      text: text,
+      length: text.length
+    });
+  });
+
+  return out;
+}
+
+function googleAiOverviewMessages() {
+  const nodes = Array.from(document.querySelectorAll("div, span, section"))
+    .filter((node) => {
+      const text = cleanText(node.innerText);
+      if (text.length < 40) { return false; }
+
+      const marker = [
+        node.getAttribute("aria-label") || "",
+        node.getAttribute("class") || "",
+        node.getAttribute("data-attrid") || ""
+      ].join(" ").toLowerCase();
+
+      return marker.includes("ai") ||
+        marker.includes("overview") ||
+        marker.includes("generative") ||
+        text.toLowerCase().includes("ai overview");
+    });
+
+  const seen = {};
+  const out = [];
+
+  nodes.forEach((node) => {
+    const text = cleanText(node.innerText);
+    if (!text || seen[text]) { return; }
+    seen[text] = true;
+
+    out.push({
+      role: "assistant",
+      text: text,
+      length: text.length
+    });
+  });
+
+  return out.slice(0, 5);
+}
+
+function genericMessages() {
     const selectors = ["[data-message-author-role]", "article", ".markdown", ".message"];
     const seen = new Set();
     const out = [];
@@ -98,7 +224,17 @@ if (!window.__HAAI_CONTENT_LOADED__) {
 
   function collectMessages() {
     if (provider() === "chatgpt") {
-      const exact = chatgptMessages();
+      if (googleAiProviderName() === "gemini" || googleAiProviderName() === "google-ai-studio") {
+      const gemini = geminiMessages();
+      if (gemini.length > 0) { return gemini; }
+    }
+
+    if (googleAiProviderName() === "google-ai-overview") {
+      const overview = googleAiOverviewMessages();
+      if (overview.length > 0) { return overview; }
+    }
+
+    const exact = chatgptMessages();
       if (exact.length > 0) { return exact; }
     }
 
