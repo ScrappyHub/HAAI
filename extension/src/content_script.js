@@ -88,10 +88,6 @@ function provider() {
     return out.slice(-32);
   }
 
-  function cleanText(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
-}
-
 function geminiMessages() {
   const selectors = [
     "message-content",
