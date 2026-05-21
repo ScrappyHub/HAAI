@@ -51,6 +51,23 @@ function timelineSummary(timeline) {
   ].join("\n");
 }
 
+function latestTimelineSummary(timeline) {
+
+  if (!Array.isArray(timeline) || timeline.length === 0) {
+    return "No previous captures.";
+  }
+
+  const last = timeline[timeline.length - 1];
+
+  return (
+    (last.provider || "unknown") +
+    " | " +
+    (last.domain || "-") +
+    " | " +
+    (last.title || "Untitled")
+  );
+}
+
 function formatState(state, timeline) {
   const surface = state && state.surface ? state.surface : {};
   const lifecycle = state && state.lifecycle ? state.lifecycle : {};
@@ -194,6 +211,34 @@ probeButton.addEventListener("click", async () => {
 });
 
 beginButton.addEventListener("click", async () => {
+
+  const tabInfo = await currentTabSummary();
+
+  if (!tabInfo.ok) {
+
+    if (tabInfo.restricted) {
+
+      say(
+        "Cannot capture this browser page.\n\n" +
+        "Open ChatGPT, Gemini, Grok, Claude, Perplexity, or another AI page first.\n\n" +
+        "Current tab:\n" +
+        tabInfo.url
+      );
+
+      note("Capture blocked.");
+
+      return;
+    }
+
+    say(
+      "Could not inspect the current browser tab.\n\n" +
+      "Reason: " + tabInfo.reason
+    );
+
+    note("Capture blocked.");
+
+    return;
+  }
   try {
     await probePage();
 
