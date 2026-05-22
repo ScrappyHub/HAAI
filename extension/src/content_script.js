@@ -246,7 +246,58 @@ function genericMessages() {
     return location.hostname + location.pathname;
   }
 
-  function surface(messages) {
+  function normalizeRole(message, index, total) {
+  const rawRole = String((message && message.role) || "").toLowerCase();
+  const text = String((message && message.text) || "").trim();
+
+  if (rawRole === "user" || rawRole === "assistant" || rawRole === "system" || rawRole === "tool") {
+    return rawRole;
+  }
+
+  if (index === 0 && total === 1) {
+    return "assistant";
+  }
+
+  if (index % 2 === 0) {
+    return "user";
+  }
+
+  if (text.length > 120 || index > 0) {
+    return "assistant";
+  }
+
+  return "unknown";
+}
+
+function normalizeMessage(message, index, providerName) {
+  const text = String((message && message.text) || "").trim();
+
+  return {
+    schema: "haai.normalized_message.v1",
+    provider: providerName || "unknown",
+    sequence: index,
+    role: normalizeRole(message, index, -1),
+    content_text: text,
+    content_length: text.length,
+    visible: true,
+    streamed: false,
+    citation_count: (text.match(/⁠|†|\[\d+\]|http/gi) || []).length,
+    tool_calls: [],
+    reasoning_visible: false
+  };
+}
+
+function normalizeMessages(messages, providerName) {
+  const total = Array.isArray(messages) ? messages.length : [];
+
+  return (messages || []).map((message, index) => {
+    const row = normalizeMessage(message, index, providerName);
+    row.role = normalizeRole(message, index, total);
+    return row;
+  });
+}
+
+function surface(messages) {
     return {
       detected: provider() !== "unknown" || messages.length > 0 || inputText().length > 0,
       provider: provider(),
@@ -255,6 +306,7 @@ function genericMessages() {
       title: document.title || "",
       conversation_id: conversationId(),
       message_count: messages.length,
+      normalized_messages: normalizeMessages(messages, provider()),
       input_detected: inputText().length > 0 || Boolean(document.querySelector("textarea,[contenteditable='true'],div[role='textbox']"))
     };
   }
