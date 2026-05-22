@@ -144,6 +144,40 @@ function getState(showSummary) {
   });
 }
 
+async function currentTabSummary() {
+  try {
+    const tab = await activeTab();
+
+    if (!tab || !tab.url) {
+      return { ok: false, reason: "No active tab detected." };
+    }
+
+    const url = String(tab.url || "");
+
+    if (
+      url.startsWith("chrome://") ||
+      url.startsWith("edge://") ||
+      url.startsWith("opera://") ||
+      url.startsWith("about:") ||
+      url.startsWith("chrome-extension://")
+    ) {
+      return {
+        ok: false,
+        restricted: true,
+        url: url,
+        reason: "Restricted browser page."
+      };
+    }
+
+    return { ok: true, url: url };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: String(err && err.message ? err.message : err)
+    };
+  }
+}
+
 async function activeTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
 
