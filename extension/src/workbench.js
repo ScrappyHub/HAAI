@@ -14,9 +14,11 @@ const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
 const verifyReplay = document.getElementById("verifyReplay");
+const toggleTechnical = document.getElementById("toggleTechnical");
 
 let lastState = null;
 let lastTimeline = [];
+let technicalVisible = false;
 let lastArchive = [];
 let compareSelection = [];
 
@@ -598,5 +600,17 @@ exportReport.addEventListener("click", async () => {
   details.textContent = "Replay report exported.\n\nFile: " + filename + "\nReport SHA-256: " + finalHash + "\nEvent hashes: " + report.event_hash_count + "\nEvent chain head: " + report.event_chain_head_sha256;
 });
 
+toggleTechnical.addEventListener("click", () => {
+
+  setTechnicalVisible(!technicalVisible);
+
+  if (!technicalVisible) {
+    replay.textContent =
+      humanReplaySummary(lastState || {}) +
+      "\n\nTechnical evidence hidden.";
+  }
+});
+
 refresh.addEventListener("click", load);
+setTechnicalVisible(false);
 load();
