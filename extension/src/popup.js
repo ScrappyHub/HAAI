@@ -51,6 +51,39 @@ function timelineSummary(timeline) {
   ].join("\n");
 }
 
+function humanCaptureState(state) {
+
+  if (!state) {
+    return "No capture state available.";
+  }
+
+  const provider = state.surface && state.surface.provider
+    ? state.surface.provider
+    : "unknown";
+
+  const domain = state.surface && state.surface.domain
+    ? state.surface.domain
+    : "-";
+
+  const messages = state.surface && state.surface.message_count
+    ? state.surface.message_count
+    : 0;
+
+  const active = state.active_capture === true;
+
+  const mode = active
+    ? "Capture is active."
+    : "Capture is stopped.";
+
+  return (
+    mode + "\n\n" +
+    "Provider: " + provider + "\n" +
+    "Domain: " + domain + "\n" +
+    "Visible messages: " + messages + "\n" +
+    "Conversation monitoring: " + (active ? "enabled" : "disabled")
+  );
+}
+
 function latestTimelineSummary(timeline) {
 
   if (!Array.isArray(timeline) || timeline.length === 0) {
@@ -137,7 +170,7 @@ function getState(showSummary) {
     render(response.state);
 
     if (showSummary) {
-      say(formatState(response.state, response.timeline));
+      say(humanCaptureState(response.state) + "\n\n" + formatState(response.state, response.timeline));
     }
 
     note("Session state refreshed.");
@@ -371,7 +404,7 @@ stopButton.addEventListener("click", () => {
     render(response.state);
     chrome.runtime.sendMessage({ type: "haai_get_state" }, (fresh) => {
       const timeline = fresh && fresh.timeline ? fresh.timeline : [];
-      say(formatState(response.state, timeline) + "\n\nCapture stopped. Session evidence is saved and ready to export.");
+      say(humanCaptureState(response.state) + "\n\nConversation capture stopped.\n\nThis replay has been preserved locally and is ready for export.");
     });
     note("Capture stopped.");
   });
@@ -452,7 +485,7 @@ exportButton.addEventListener("click", () => {
 
     chrome.runtime.sendMessage({ type: "haai_get_state" }, (fresh) => {
       const timeline = fresh && fresh.timeline ? fresh.timeline : [];
-      say("Export ready.\n\nFile: " + response.filename + "\nSHA-256: " + response.sha256 + "\n\n" + timelineSummary(timeline));
+      say("Conversation export ready.\n\nSaved file:\n" + response.filename + "\n\nIntegrity fingerprint:\n" + response.sha256 + "\n\nThe replay archive has been frozen and can now be verified later.");
     });
     note("Session export ready.");
   });

@@ -351,6 +351,39 @@ async function verifyCurrentReplay(state) {
   };
 }
 
+function humanReplaySummary(state) {
+
+  if (!state) {
+    return "No replay available.";
+  }
+
+  const surface = state.surface || {};
+  const provider = surface.provider || "unknown";
+  const domain = surface.domain || "-";
+  const title = surface.title || "Untitled conversation";
+
+  const active = state.active_capture === true
+    ? "Capture Active"
+    : "Capture Stopped";
+
+  const events = Array.isArray(state.events)
+    ? state.events.length
+    : 0;
+
+  const snapshots = countEvents(state.events || [], "conversation_snapshot");
+
+  return (
+    "Conversation Replay Summary\n\n" +
+    "Title: " + title + "\n" +
+    "Provider: " + provider + "\n" +
+    "Domain: " + domain + "\n" +
+    "State: " + active + "\n" +
+    "Recorded events: " + events + "\n" +
+    "Conversation snapshots: " + snapshots + "\n\n" +
+    "This replay archive can be exported, verified, and reviewed later."
+  );
+}
+
 function buildReplayText(state) {
   const events = state && Array.isArray(state.events) ? state.events : [];
   const surface = state && state.surface ? state.surface : {};
