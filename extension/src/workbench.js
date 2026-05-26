@@ -15,10 +15,12 @@ const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
 const verifyReplay = document.getElementById("verifyReplay");
 const toggleTechnical = document.getElementById("toggleTechnical");
+const evidenceStatus = document.getElementById("evidenceStatus");
 
 let lastState = null;
 let lastTimeline = [];
 let technicalVisible = false;
+let lastVerifyResult = null;
 let lastArchive = [];
 let compareSelection = [];
 
@@ -429,6 +431,7 @@ function buildReplayText(state) {
 
 function render(data) {
   lastState = data.state || {};
+  refreshEvidenceStatus();
   lastTimeline = Array.isArray(data.timeline) ? data.timeline : [];
   lastArchive = Array.isArray(data.archive) ? data.archive : [];
 
@@ -564,6 +567,8 @@ compareReplay.addEventListener("click", async () => {
 
 verifyReplay.addEventListener("click", async () => {
   const result = await verifyCurrentReplay(lastState || {});
+  lastVerifyResult = result;
+  refreshEvidenceStatus();
   details.textContent = JSON.stringify(result, null, 2);
 
   if (result.ok) {
@@ -613,4 +618,5 @@ toggleTechnical.addEventListener("click", () => {
 
 refresh.addEventListener("click", load);
 setTechnicalVisible(false);
+refreshEvidenceStatus();
 load();
