@@ -211,8 +211,75 @@ async function probePage() {
   });
 }
 
-checkButton.addEventListener("click", () => {
-  getState(true);
+checkButton.addEventListener("click", async () => {
+  note("Checking active tab and session state...");
+
+  const tabInfo = await currentTabSummary();
+
+  if (!tabInfo.ok) {
+    getState(false);
+
+    if (tabInfo.restricted) {
+      say(
+        "Current tab cannot be captured.\n\n" +
+        "Current tab:\n" +
+        tabInfo.url + "\n\n" +
+        "Open an AI page, then click Probe Page or Begin Capture."
+      );
+    } else {
+      say(
+        "Could not inspect the current browser tab.\n\n" +
+        "Reason: " + tabInfo.reason + "\n\n" +
+        "Saved HAAI session state was refreshed separately."
+      );
+    }
+
+    note("Check complete.");
+    return;
+  }
+
+  const probe = await probePage();
+
+  chrome.runtime.sendMessage({ type: "haai_get_state" }, (response) => {
+    if (chrome.runtime.lastError) {
+      say("HAAI check failed.\n\n" + chrome.runtime.lastError.message);
+      note("Check failed.");
+      return;
+    }
+
+    if (!response || !response.ok) {
+      say("HAAI check failed. Background state was unavailable.");
+      note("Check failed.");
+      return;
+    }
+
+    render(response.state);
+
+    if (!probe || !probe.ok) {
+      say(
+        "Active tab:\n" +
+        tabInfo.url + "\n\n" +
+        "HAAI could not attach to the page.\n\n" +
+        "Reason: " + (probe ? probe.reason : "unknown") + "\n\n" +
+        formatState(response.state, response.timeline)
+      );
+      note("Check complete with probe warning.");
+      return;
+    }
+
+    say(
+      "Current AI page detected.\n\n" +
+      "Current tab:\n" +
+      tabInfo.url + "\n\n" +
+      "Provider: " + probe.surface.provider + "\n" +
+      "Domain: " + probe.surface.domain + "\n" +
+      "Visible messages: " + probe.surface.message_count + "\n" +
+      "Input box detected: " + (probe.surface.input_detected ? "yes" : "no") + "\n\n" +
+      formatState(response.state, response.timeline)
+    );
+
+    note("Check complete.");
+  });
 });
 
 probeButton.addEventListener("click", async () => {
