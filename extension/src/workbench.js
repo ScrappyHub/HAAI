@@ -23,6 +23,7 @@ const snapshotPrev = document.getElementById("snapshotPrev");
 const snapshotNext = document.getElementById("snapshotNext");
 const snapshotLatest = document.getElementById("snapshotLatest");
 const snapshotCompare = document.getElementById("snapshotCompare");
+const snapshotDeltaExport = document.getElementById("snapshotDeltaExport");
 const snapshotView = document.getElementById("snapshotView");
 
 let lastState = null;
@@ -32,6 +33,7 @@ let lastVerifyResult = null;
 let importedReplayState = null;
 let replaySnapshots = [];
 let snapshotIndex = -1;
+let lastSnapshotDelta = null;
 let lastArchive = [];
 let compareSelection = [];
 
@@ -1055,6 +1057,7 @@ function compareCurrentSnapshotWithPrevious() {
   const left = replaySnapshots[snapshotIndex - 1];
   const right = replaySnapshots[snapshotIndex];
   const diff = compareSnapshots(left, right);
+  lastSnapshotDelta = diff;
 
   snapshotView.textContent = [
     "Snapshot Change Summary",
@@ -1077,4 +1080,39 @@ function compareCurrentSnapshotWithPrevious() {
 }
 snapshotCompare.addEventListener("click", () => {
   compareCurrentSnapshotWithPrevious();
+});
+
+async function exportSnapshotDelta() {
+  if (!lastSnapshotDelta) {
+    compareCurrentSnapshotWithPrevious();
+  }
+
+  if (!lastSnapshotDelta) {
+    snapshotView.textContent = "No snapshot delta available to export yet.";
+    return;
+  }
+
+  const body = JSON.stringify(lastSnapshotDelta, null, 2);
+  const hash = await sha256Hex(body);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  const envelope = {
+    schema: "haai.snapshot_delta_export.v1",
+    created_utc: new Date().toISOString(),
+    sha256: hash,
+    delta: lastSnapshotDelta
+  };
+
+  const finalBody = JSON.stringify(envelope, null, 2);
+  const filename = "haai_snapshot_delta_" + stamp + "_" + hash.slice(0, 16) + ".json";
+
+  downloadText(filename, finalBody, "application/json");
+
+  snapshotView.textContent =
+    "Snapshot delta exported.\n\n" +
+    "File: " + filename + "\n" +
+    "SHA-256: " + hash;
+}
+snapshotDeltaExport.addEventListener("click", async () => {
+  await exportSnapshotDelta();
 });
