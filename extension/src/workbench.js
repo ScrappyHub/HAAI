@@ -308,6 +308,7 @@ function replayReportObject(state, timeline) {
     session_stopped_utc: state.session_stopped_utc || "",
     last_activity_utc: state.last_activity_utc || "",
     event_count: events.length,
+    events: events,
     input_event_count: countEvents(events, "input_surface_changed"),
     snapshot_event_count: countEvents(events, "conversation_snapshot"),
     domain_changes: lifecycle.domain_changes || 0,
@@ -317,7 +318,8 @@ function replayReportObject(state, timeline) {
     latest_snapshot_summary: snapshotSummary(lastSnapshot),
     event_type_counts: eventTypeCounts(events),
     timeline_count: Array.isArray(timeline) ? timeline.length : 0,
-    timeline_recent: Array.isArray(timeline) ? timeline.slice(-5) : []
+    timeline_recent: Array.isArray(timeline) ? timeline.slice(-5) : [],
+    includes_full_events: true
   };
 }
 
@@ -364,6 +366,7 @@ async function verifyCurrentReplay(state) {
     failures: failures,
     session_id: state.session_id || "",
     event_count: events.length,
+    events: events,
     event_hash_count: hashes.length,
     event_chain_head_sha256: chainHead,
     first_event_type: events.length && events[0] ? (events[0].event_type || "unknown") : "",
@@ -1132,6 +1135,7 @@ function replayCertificationObject() {
     session_started_utc: state.session_started_utc || "",
     session_stopped_utc: state.session_stopped_utc || "",
     event_count: events.length,
+    events: events,
     snapshot_count: snapshots.length,
     timeline_capture_count: Array.isArray(lastTimeline)
       ? lastTimeline.length
