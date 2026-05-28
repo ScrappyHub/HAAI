@@ -13,6 +13,7 @@ const refresh = document.getElementById("refresh");
 const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
+const freezeBundle = document.getElementById("freezeBundle");
 const verifyReplay = document.getElementById("verifyReplay");
 const toggleTechnical = document.getElementById("toggleTechnical");
 const evidenceStatus = document.getElementById("evidenceStatus");
@@ -565,6 +566,11 @@ compareReplay.addEventListener("click", async () => {
     "Stability Ratio: " + diff.stability_ratio;
 });
 
+freezeBundle.addEventListener("click", async () => {
+
+  await freezeReplayBundleExport();
+});
+
 verifyReplay.addEventListener("click", async () => {
   const result = await verifyCurrentReplay(lastState || {});
   lastVerifyResult = result;
@@ -620,3 +626,105 @@ refresh.addEventListener("click", load);
 setTechnicalVisible(false);
 refreshEvidenceStatus();
 load();
+
+async function buildSha256Lines(files) {
+
+  const rows = [];
+
+  for (const file of files) {
+
+    const hash = await sha256Hex(file.body);
+
+    rows.push(hash + "  " + file.name);
+  }
+
+  return rows.join("\n");
+}
+
+function replaySummaryText(state) {
+
+  const surface = state && state.surface
+    ? state.surface
+    : {};
+
+  return [
+    "HAAI Replay Freeze Bundle",
+    "",
+    "Provider: " + (surface.provider || "unknown"),
+    "Domain: " + (surface.domain || "-"),
+    "Title: " + (surface.title || "Untitled"),
+    "Capture State: " + (state.active_capture ? "running" : "stopped"),
+    "Events: " + ((state.events || []).length),
+    "Generated UTC: " + new Date().toISOString()
+  ].join("\n");
+}
+
+async function freezeReplayBundleExport() {
+
+  const state = lastState || {};
+  const verify = await verifyCurrentReplay(state);
+  const report = replayReportObject(state, lastTimeline || []);
+
+  const replayText = buildReplayText(state);
+
+  const chainLines = (report.event_chain_hashes || []).map((row) => {
+    return (
+      String(row.index) +
+      " | " +
+      String(row.event_type || "unknown") +
+      " | " +
+      String(row.event_chain_hash_sha256 || "")
+    );
+  });
+
+  const files = [
+    {
+      name: "summary.txt",
+      body: replaySummaryText(state)
+    },
+    {
+      name: "replay_report.json",
+      body: JSON.stringify(report, null, 2)
+    },
+    {
+      name: "verification.json",
+      body: JSON.stringify(verify, null, 2)
+    },
+    {
+      name: "replay_chain.txt",
+      body: chainLines.join("\n")
+    },
+    {
+      name: "replay.txt",
+      body: replayText
+    }
+  ];
+
+  const shaLines = await buildSha256Lines(files);
+
+  files.push({
+    name: "sha256sums.txt",
+    body: shaLines
+  });
+
+  for (const file of files) {
+
+    const filename =
+      "haai_freeze_bundle/" +
+      file.name;
+
+    downloadText(
+      filename,
+      file.body,
+      "text/plain"
+    );
+  }
+
+  replay.textContent =
+    humanReplaySummary(state) +
+    "\n\nFreeze bundle exported successfully.";
+
+  details.textContent =
+    "Freeze bundle exported.\n\n" +
+    files.map((f) => f.name).join("\n");
+}
