@@ -14,6 +14,7 @@ const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
 const freezeBundle = document.getElementById("freezeBundle");
+const certificationReport = document.getElementById("certificationReport");
 const importReplayBundle = document.getElementById("importReplayBundle");
 const importReplayInput = document.getElementById("importReplayInput");
 const verifyReplay = document.getElementById("verifyReplay");
@@ -1115,4 +1116,121 @@ async function exportSnapshotDelta() {
 }
 snapshotDeltaExport.addEventListener("click", async () => {
   await exportSnapshotDelta();
+});
+
+function replayCertificationObject() {
+
+  const state = lastState || {};
+  const surface = state.surface || {};
+  const events = Array.isArray(state.events)
+    ? state.events
+    : [];
+
+  const snapshots = events.filter((event) => {
+    return event && event.event_type === "conversation_snapshot";
+  });
+
+  return {
+    schema: "haai.replay_certification.v1",
+    certified_utc: new Date().toISOString(),
+    replay_preserved: events.length > 0,
+    replay_integrity_verified: lastVerifyResult
+      ? Boolean(lastVerifyResult.ok)
+      : false,
+    provider: surface.provider || "unknown",
+    domain: surface.domain || "",
+    title: surface.title || "",
+    session_id: state.session_id || "",
+    session_started_utc: state.session_started_utc || "",
+    session_stopped_utc: state.session_stopped_utc || "",
+    event_count: events.length,
+    snapshot_count: snapshots.length,
+    timeline_capture_count: Array.isArray(lastTimeline)
+      ? lastTimeline.length
+      : 0,
+    exports_recorded: state.lifecycle
+      ? (state.lifecycle.exports || 0)
+      : 0,
+    delta_artifacts_available: Boolean(lastSnapshotDelta),
+    imported_replay_loaded: Boolean(importedReplayState)
+  };
+}
+
+function certificationSummaryText(report) {
+
+  return [
+    "HAAI Replay Certification Report",
+    "",
+    "Replay preserved: " + (report.replay_preserved ? "YES" : "NO"),
+    "Replay integrity verified: " + (report.replay_integrity_verified ? "YES" : "NOT VERIFIED"),
+    "",
+    "Provider: " + (report.provider || "unknown"),
+    "Domain: " + (report.domain || "-"),
+    "Title: " + (report.title || "Untitled"),
+    "Session ID: " + (report.session_id || "-"),
+    "",
+    "Session started: " + (report.session_started_utc || "-"),
+    "Session stopped: " + (report.session_stopped_utc || "-"),
+    "",
+    "Recorded events: " + report.event_count,
+    "Conversation snapshots: " + report.snapshot_count,
+    "Timeline captures: " + report.timeline_capture_count,
+    "Exports recorded: " + report.exports_recorded,
+    "",
+    "Snapshot delta artifacts available: " +
+      (report.delta_artifacts_available ? "YES" : "NO"),
+    "",
+    "Imported replay loaded: " +
+      (report.imported_replay_loaded ? "YES" : "NO"),
+    "",
+    "Recommended review notes:",
+    "- Verify replay integrity before external sharing.",
+    "- Preserve exported freeze bundles unchanged.",
+    "- Use snapshot comparison for conversation evolution review.",
+    "- Technical evidence can remain hidden for human-first review."
+  ].join("\n");
+}
+
+async function exportCertificationReport() {
+
+  const report = replayCertificationObject();
+
+  const summary = certificationSummaryText(report);
+
+  const hash = await sha256Hex(summary);
+
+  const envelope = {
+    schema: "haai.replay_certification_export.v1",
+    created_utc: new Date().toISOString(),
+    sha256: hash,
+    certification: report,
+    summary_text: summary
+  };
+
+  const stamp =
+    envelope.created_utc.replace(/[:.]/g, "-");
+
+  const filename =
+    "haai_replay_certification_" +
+    stamp +
+    "_" +
+    hash.slice(0, 16) +
+    ".txt";
+
+  downloadText(
+    filename,
+    summary,
+    "text/plain"
+  );
+
+  replay.textContent =
+    summary +
+    "\n\nCertification report exported.";
+
+  details.textContent =
+    JSON.stringify(envelope, null, 2);
+}
+certificationReport.addEventListener("click", async () => {
+
+  await exportCertificationReport();
 });
