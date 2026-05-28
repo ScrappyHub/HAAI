@@ -26,6 +26,7 @@ const snapshotLatest = document.getElementById("snapshotLatest");
 const snapshotCompare = document.getElementById("snapshotCompare");
 const snapshotDeltaExport = document.getElementById("snapshotDeltaExport");
 const snapshotView = document.getElementById("snapshotView");
+const filmstrip = document.getElementById("filmstrip");
 
 let lastState = null;
 let lastTimeline = [];
@@ -447,6 +448,7 @@ function render(data) {
   lastState = data.state || {};
   refreshEvidenceStatus();
   refreshSnapshotNavigator();
+  renderFilmstrip();
   lastTimeline = Array.isArray(data.timeline) ? data.timeline : [];
   lastArchive = Array.isArray(data.archive) ? data.archive : [];
 
@@ -590,6 +592,7 @@ verifyReplay.addEventListener("click", async () => {
   lastVerifyResult = result;
   refreshEvidenceStatus();
   refreshSnapshotNavigator();
+  renderFilmstrip();
   details.textContent = JSON.stringify(result, null, 2);
 
   if (result.ok) {
@@ -641,6 +644,7 @@ refresh.addEventListener("click", load);
 setTechnicalVisible(false);
 refreshEvidenceStatus();
   refreshSnapshotNavigator();
+  renderFilmstrip();
 load();
 
 async function buildSha256Lines(files) {
@@ -943,6 +947,7 @@ function refreshSnapshotNavigator() {
 function moveSnapshot(delta) {
   if (!Array.isArray(replaySnapshots) || replaySnapshots.length === 0) {
     refreshSnapshotNavigator();
+  renderFilmstrip();
     return;
   }
 
@@ -957,6 +962,7 @@ function moveSnapshot(delta) {
   }
 
   refreshSnapshotNavigator();
+  renderFilmstrip();
 }
 snapshotPrev.addEventListener("click", () => {
   moveSnapshot(-1);
@@ -968,9 +974,11 @@ snapshotNext.addEventListener("click", () => {
 
 snapshotLatest.addEventListener("click", () => {
   refreshSnapshotNavigator();
+  renderFilmstrip();
   if (replaySnapshots.length > 0) {
     snapshotIndex = replaySnapshots.length - 1;
     refreshSnapshotNavigator();
+  renderFilmstrip();
   }
 });
 
@@ -1045,6 +1053,7 @@ function compareSnapshots(left, right) {
 
 function compareCurrentSnapshotWithPrevious() {
   refreshSnapshotNavigator();
+  renderFilmstrip();
 
   if (!Array.isArray(replaySnapshots) || replaySnapshots.length < 2) {
     snapshotView.textContent = "Need at least two snapshots before comparison is available.";
@@ -1234,3 +1243,93 @@ certificationReport.addEventListener("click", async () => {
 
   await exportCertificationReport();
 });
+
+function snapshotMessageCount(snapshot) {
+
+  if (!snapshot || !snapshot.payload) {
+    return 0;
+  }
+
+  const payload = snapshot.payload;
+
+  if (typeof payload.message_count === "number") {
+    return payload.message_count;
+  }
+
+  const msgs = snapshotMessages(snapshot);
+
+  return msgs.length;
+}
+
+function renderFilmstrip() {
+
+  if (!filmstrip) {
+    return;
+  }
+
+  filmstrip.innerHTML = "";
+
+  if (!Array.isArray(replaySnapshots) || replaySnapshots.length === 0) {
+
+    filmstrip.textContent =
+      "No replay snapshots available.";
+
+    return;
+  }
+
+  replaySnapshots.forEach((snapshot, index) => {
+
+    const card = document.createElement("div");
+
+    card.className =
+      "snapshotCard" +
+      (index === snapshotIndex ? " active" : "");
+
+    const payload = snapshot.payload || {};
+
+    const previous =
+      index > 0
+        ? replaySnapshots[index - 1]
+        : null;
+
+    let deltaText = "Initial snapshot";
+
+    if (previous) {
+
+      const diff =
+        compareSnapshots(previous, snapshot);
+
+      deltaText =
+        "+" + diff.added_count +
+        " added / -" +
+        diff.removed_count +
+        " removed";
+    }
+
+    card.innerHTML =
+      '<div class="snapshotTitle">' +
+        "Snapshot " + (index + 1) +
+      '</div>' +
+
+      '<div class="snapshotMeta">' +
+        "Messages: " + snapshotMessageCount(snapshot) + "<br>" +
+        "Provider: " + (payload.provider || "unknown") + "<br>" +
+        "Captured: " + (snapshot.created_utc || "-") +
+      '</div>' +
+
+      '<div class="snapshotDelta">' +
+        deltaText +
+      '</div>';
+
+    card.addEventListener("click", () => {
+
+      snapshotIndex = index;
+
+      refreshSnapshotNavigator();
+  renderFilmstrip();
+      renderFilmstrip();
+    });
+
+    filmstrip.appendChild(card);
+  });
+}
