@@ -837,29 +837,7 @@ importReplayInput.addEventListener("change", async (event) => {
       return;
     }
 
-    const report = await readJsonFile(file);
-
-    importedReplayState = report;
-
-    const verify = await verifyImportedReplay(report);
-
-    details.textContent =
-      JSON.stringify(verify, null, 2);
-
-    replay.textContent =
-      importedReplaySummary(report);
-
-    if (!verify.ok) {
-
-      replay.textContent +=
-        "\n\nImported replay verification failed:\n" +
-        verify.failures.join("\n");
-
-      return;
-    }
-
-    replay.textContent +=
-      "\n\nImported replay is now available for offline inspection.";
+    await importReplayReportFile(file);
 
   } catch (err) {
 
