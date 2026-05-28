@@ -22,6 +22,7 @@ const evidenceStatus = document.getElementById("evidenceStatus");
 const snapshotPrev = document.getElementById("snapshotPrev");
 const snapshotNext = document.getElementById("snapshotNext");
 const snapshotLatest = document.getElementById("snapshotLatest");
+const snapshotCompare = document.getElementById("snapshotCompare");
 const snapshotView = document.getElementById("snapshotView");
 
 let lastState = null;
@@ -968,4 +969,112 @@ snapshotLatest.addEventListener("click", () => {
     snapshotIndex = replaySnapshots.length - 1;
     refreshSnapshotNavigator();
   }
+});
+
+function snapshotMessages(snapshot) {
+  if (!snapshot || !snapshot.payload) {
+    return [];
+  }
+
+  const payload = snapshot.payload;
+
+  if (Array.isArray(payload.normalized_messages)) {
+    return payload.normalized_messages.map((msg) => {
+      return {
+        role: msg.role || "unknown",
+        text: msg.content_text || ""
+      };
+    });
+  }
+
+  if (Array.isArray(payload.messages)) {
+    return payload.messages.map((msg) => {
+      return {
+        role: msg.role || "unknown",
+        text: msg.text || ""
+      };
+    });
+  }
+
+  return [];
+}
+
+function compareSnapshots(left, right) {
+  const leftRows = snapshotMessages(left);
+  const rightRows = snapshotMessages(right);
+
+  const leftTexts = leftRows.map((row) => row.role + "::" + row.text);
+  const rightTexts = rightRows.map((row) => row.role + "::" + row.text);
+
+  const added = rightTexts.filter((x) => !leftTexts.includes(x));
+  const removed = leftTexts.filter((x) => !rightTexts.includes(x));
+
+  const leftLast = leftRows.length ? leftRows[leftRows.length - 1] : null;
+  const rightLast = rightRows.length ? rightRows[rightRows.length - 1] : null;
+
+  const assistantChanged =
+    Boolean(leftLast && rightLast) &&
+    leftLast.role === "assistant" &&
+    rightLast.role === "assistant" &&
+    leftLast.text !== rightLast.text;
+
+  const inputChanged =
+    Boolean(leftLast && rightLast) &&
+    leftLast.role === "user" &&
+    rightLast.role === "user" &&
+    leftLast.text !== rightLast.text;
+
+  return {
+    schema: "haai.snapshot_delta.v1",
+    left_captured_utc: left && left.created_utc ? left.created_utc : "",
+    right_captured_utc: right && right.created_utc ? right.created_utc : "",
+    left_message_count: leftRows.length,
+    right_message_count: rightRows.length,
+    message_count_delta: rightRows.length - leftRows.length,
+    added_count: added.length,
+    removed_count: removed.length,
+    assistant_changed: assistantChanged,
+    input_changed: inputChanged,
+    added_examples: added.slice(0, 5),
+    removed_examples: removed.slice(0, 5)
+  };
+}
+
+function compareCurrentSnapshotWithPrevious() {
+  refreshSnapshotNavigator();
+
+  if (!Array.isArray(replaySnapshots) || replaySnapshots.length < 2) {
+    snapshotView.textContent = "Need at least two snapshots before comparison is available.";
+    return;
+  }
+
+  if (snapshotIndex <= 0) {
+    snapshotIndex = 1;
+  }
+
+  const left = replaySnapshots[snapshotIndex - 1];
+  const right = replaySnapshots[snapshotIndex];
+  const diff = compareSnapshots(left, right);
+
+  snapshotView.textContent = [
+    "Snapshot Change Summary",
+    "",
+    "From: " + (diff.left_captured_utc || "-"),
+    "To: " + (diff.right_captured_utc || "-"),
+    "",
+    "Visible message count changed by: " + diff.message_count_delta,
+    "Messages added: " + diff.added_count,
+    "Messages removed: " + diff.removed_count,
+    "Assistant response changed: " + (diff.assistant_changed ? "yes" : "no"),
+    "User input changed: " + (diff.input_changed ? "yes" : "no"),
+    "",
+    "Added examples:",
+    diff.added_examples.length ? diff.added_examples.join("\n\n") : "- none",
+    "",
+    "Removed examples:",
+    diff.removed_examples.length ? diff.removed_examples.join("\n\n") : "- none"
+  ].join("\n");
+}
+snapshotCompare.addEventListener("click", () => {
+  compareCurrentSnapshotWithPrevious();
 });
