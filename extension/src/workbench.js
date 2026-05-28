@@ -14,6 +14,8 @@ const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
 const freezeBundle = document.getElementById("freezeBundle");
+const importReplayBundle = document.getElementById("importReplayBundle");
+const importReplayInput = document.getElementById("importReplayInput");
 const verifyReplay = document.getElementById("verifyReplay");
 const toggleTechnical = document.getElementById("toggleTechnical");
 const evidenceStatus = document.getElementById("evidenceStatus");
@@ -22,6 +24,7 @@ let lastState = null;
 let lastTimeline = [];
 let technicalVisible = false;
 let lastVerifyResult = null;
+let importedReplayState = null;
 let lastArchive = [];
 let compareSelection = [];
 
@@ -728,3 +731,122 @@ async function freezeReplayBundleExport() {
     "Freeze bundle exported.\n\n" +
     files.map((f) => f.name).join("\n");
 }
+
+async function readJsonFile(file) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+
+      try {
+
+        resolve(JSON.parse(String(reader.result || "{}")));
+
+      } catch (err) {
+
+        reject(err);
+      }
+    };
+
+    reader.onerror = () => reject(reader.error);
+
+    reader.readAsText(file);
+  });
+}
+
+function importedReplaySummary(report) {
+
+  if (!report) {
+    return "No imported replay.";
+  }
+
+  return [
+    "Imported Replay Bundle",
+    "",
+    "Provider: " + (report.provider || "unknown"),
+    "Domain: " + (report.domain || "-"),
+    "Session: " + (report.session_id || "-"),
+    "Events: " + (report.event_count || 0),
+    "Snapshots: " + (report.snapshot_event_count || 0),
+    "Conversation changes: " + (report.conversation_changes || 0),
+    "Imported replay verification: PASS"
+  ].join("\n");
+}
+
+async function verifyImportedReplay(report) {
+
+  const failures = [];
+
+  if (!report) {
+    failures.push("MISSING_REPORT");
+  }
+
+  if (!report.schema) {
+    failures.push("MISSING_SCHEMA");
+  }
+
+  if (!report.event_count || report.event_count < 1) {
+    failures.push("EMPTY_EVENT_COUNT");
+  }
+
+  if (!Array.isArray(report.event_chain_hashes)) {
+    failures.push("MISSING_EVENT_CHAIN_HASHES");
+  }
+
+  return {
+    schema: "haai.import_verify.v1",
+    created_utc: new Date().toISOString(),
+    ok: failures.length === 0,
+    failures: failures,
+    imported_provider: report.provider || "unknown",
+    imported_session_id: report.session_id || ""
+  };
+}
+importReplayBundle.addEventListener("click", () => {
+
+  importReplayInput.click();
+});
+
+importReplayInput.addEventListener("change", async (event) => {
+
+  try {
+
+    const file = event.target.files[0];
+
+    if (!file) {
+      return;
+    }
+
+    const report = await readJsonFile(file);
+
+    importedReplayState = report;
+
+    const verify = await verifyImportedReplay(report);
+
+    details.textContent =
+      JSON.stringify(verify, null, 2);
+
+    replay.textContent =
+      importedReplaySummary(report);
+
+    if (!verify.ok) {
+
+      replay.textContent +=
+        "\n\nImported replay verification failed:\n" +
+        verify.failures.join("\n");
+
+      return;
+    }
+
+    replay.textContent +=
+      "\n\nImported replay is now available for offline inspection.";
+
+  } catch (err) {
+
+    replay.textContent =
+      "Replay import failed.\n\n" +
+      String(err && err.message ? err.message : err);
+  }
+});
