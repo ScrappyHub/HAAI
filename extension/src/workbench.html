@@ -75,6 +75,19 @@
   font-size: 12px;
   color: #7dd3fc;
 }
+.dropZone {
+  border: 1px dashed rgba(255,255,255,0.28);
+  border-radius: 14px;
+  padding: 12px;
+  margin: 10px 0 12px 0;
+  background: rgba(255,255,255,0.03);
+  font-size: 13px;
+  opacity: 0.9;
+}
+.dropZone.dragOver {
+  border-color: #7dd3fc;
+  background: rgba(125,211,252,0.08);
+}
 </style>
 </head>
 <body>
@@ -114,6 +127,10 @@
       <br>
 
       <h2>Replay Timeline Filmstrip</h2>
+
+<div id="dropZone" class="dropZone">
+  Drop a HAAI replay_report.json here, or use Import Replay Bundle.
+</div>
 
 <div id="filmstrip" class="filmstrip">
   Timeline loading...

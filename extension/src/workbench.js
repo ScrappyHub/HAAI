@@ -27,6 +27,7 @@ const snapshotCompare = document.getElementById("snapshotCompare");
 const snapshotDeltaExport = document.getElementById("snapshotDeltaExport");
 const snapshotView = document.getElementById("snapshotView");
 const filmstrip = document.getElementById("filmstrip");
+const dropZone = document.getElementById("dropZone");
 
 let lastState = null;
 let lastTimeline = [];
@@ -1333,3 +1334,98 @@ function renderFilmstrip() {
     filmstrip.appendChild(card);
   });
 }
+
+function replayReportToOfflineState(report) {
+  const surface = {
+    detected: true,
+    provider: report.provider || "unknown",
+    domain: report.domain || "",
+    url: report.url || "",
+    title: report.title || "Imported replay",
+    message_count: report.latest_snapshot_summary && report.latest_snapshot_summary.message_count
+      ? report.latest_snapshot_summary.message_count
+      : 0,
+    input_detected: true,
+    last_seen_utc: report.last_activity_utc || ""
+  };
+
+  const events = Array.isArray(report.events)
+    ? report.events
+    : [];
+
+  return {
+    active_capture: false,
+    session_id: report.session_id || "imported_replay",
+    session_started_utc: report.session_started_utc || "",
+    session_stopped_utc: report.session_stopped_utc || "",
+    last_activity_utc: report.last_activity_utc || "",
+    surface: surface,
+    lifecycle: {
+      session_started: Boolean(report.session_started_utc),
+      session_stopped: Boolean(report.session_stopped_utc),
+      domain_changes: report.domain_changes || 0,
+      conversation_changes: report.conversation_changes || 0,
+      exports: report.exports || 0
+    },
+    events: events
+  };
+}
+
+async function importReplayReportFile(file) {
+  const report = await readJsonFile(file);
+  const verify = await verifyImportedReplay(report);
+
+  importedReplayState = report;
+
+  if (Array.isArray(report.events)) {
+    lastState = replayReportToOfflineState(report);
+  }
+
+  details.textContent = JSON.stringify(verify, null, 2);
+  replay.textContent = importedReplaySummary(report);
+
+  if (!verify.ok) {
+    replay.textContent +=
+      "\n\nImported replay verification failed:\n" +
+      verify.failures.join("\n");
+    refreshEvidenceStatus();
+    refreshSnapshotNavigator();
+    return;
+  }
+
+  replay.textContent +=
+    "\n\nImported replay is loaded for offline inspection.";
+
+  refreshEvidenceStatus();
+  refreshSnapshotNavigator();
+}
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  dropZone.classList.add("dragOver");
+});
+
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("dragOver");
+});
+
+dropZone.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("dragOver");
+
+  const file = event.dataTransfer.files && event.dataTransfer.files[0]
+    ? event.dataTransfer.files[0]
+    : null;
+
+  if (!file) {
+    replay.textContent = "No replay report file was dropped.";
+    return;
+  }
+
+  try {
+    await importReplayReportFile(file);
+  } catch (err) {
+    replay.textContent =
+      "Replay import failed.\n\n" +
+      String(err && err.message ? err.message : err);
+  }
+});
