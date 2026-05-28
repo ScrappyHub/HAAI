@@ -19,12 +19,18 @@ const importReplayInput = document.getElementById("importReplayInput");
 const verifyReplay = document.getElementById("verifyReplay");
 const toggleTechnical = document.getElementById("toggleTechnical");
 const evidenceStatus = document.getElementById("evidenceStatus");
+const snapshotPrev = document.getElementById("snapshotPrev");
+const snapshotNext = document.getElementById("snapshotNext");
+const snapshotLatest = document.getElementById("snapshotLatest");
+const snapshotView = document.getElementById("snapshotView");
 
 let lastState = null;
 let lastTimeline = [];
 let technicalVisible = false;
 let lastVerifyResult = null;
 let importedReplayState = null;
+let replaySnapshots = [];
+let snapshotIndex = -1;
 let lastArchive = [];
 let compareSelection = [];
 
@@ -436,6 +442,7 @@ function buildReplayText(state) {
 function render(data) {
   lastState = data.state || {};
   refreshEvidenceStatus();
+  refreshSnapshotNavigator();
   lastTimeline = Array.isArray(data.timeline) ? data.timeline : [];
   lastArchive = Array.isArray(data.archive) ? data.archive : [];
 
@@ -578,6 +585,7 @@ verifyReplay.addEventListener("click", async () => {
   const result = await verifyCurrentReplay(lastState || {});
   lastVerifyResult = result;
   refreshEvidenceStatus();
+  refreshSnapshotNavigator();
   details.textContent = JSON.stringify(result, null, 2);
 
   if (result.ok) {
@@ -628,6 +636,7 @@ toggleTechnical.addEventListener("click", () => {
 refresh.addEventListener("click", load);
 setTechnicalVisible(false);
 refreshEvidenceStatus();
+  refreshSnapshotNavigator();
 load();
 
 async function buildSha256Lines(files) {
@@ -848,5 +857,115 @@ importReplayInput.addEventListener("change", async (event) => {
     replay.textContent =
       "Replay import failed.\n\n" +
       String(err && err.message ? err.message : err);
+  }
+});
+
+function activeReplaySource() {
+  if (importedReplayState && Array.isArray(importedReplayState.events)) {
+    return importedReplayState;
+  }
+
+  return lastState || {};
+}
+
+function extractSnapshots(source) {
+  const events = source && Array.isArray(source.events) ? source.events : [];
+
+  return events.filter((event) => {
+    return event &&
+      event.event_type === "conversation_snapshot" &&
+      event.payload;
+  });
+}
+
+function snapshotHumanText(snapshot, index, total) {
+  if (!snapshot || !snapshot.payload) {
+    return "No snapshot selected.";
+  }
+
+  const payload = snapshot.payload;
+  const messages = Array.isArray(payload.normalized_messages)
+    ? payload.normalized_messages
+    : (Array.isArray(payload.messages) ? payload.messages : []);
+
+  const lastMessages = messages.slice(-6).map((msg, i) => {
+    const role = msg.role || "unknown";
+    const text = msg.content_text || msg.text || "";
+    const preview = text.length > 220 ? text.slice(0, 220) + "..." : text;
+
+    return (i + 1) + ". " + role + ": " + preview;
+  });
+
+  return [
+    "Conversation Snapshot " + (index + 1) + " of " + total,
+    "",
+    "Captured: " + (snapshot.created_utc || "-"),
+    "Provider: " + (payload.provider || "unknown"),
+    "Domain: " + (payload.domain || "-"),
+    "Title: " + (payload.title || "-"),
+    "Visible messages: " + (payload.message_count || messages.length || 0),
+    "Input detected: " + (payload.input_detected ? "yes" : "no"),
+    "",
+    "Recent visible messages:",
+    lastMessages.length ? lastMessages.join("\n\n") : "- none"
+  ].join("\n");
+}
+
+function refreshSnapshotNavigator() {
+  const source = activeReplaySource();
+  replaySnapshots = extractSnapshots(source);
+
+  if (replaySnapshots.length === 0) {
+    snapshotIndex = -1;
+    if (snapshotView) {
+      snapshotView.textContent = "No conversation snapshots available for this replay yet.";
+    }
+    return;
+  }
+
+  if (snapshotIndex < 0 || snapshotIndex >= replaySnapshots.length) {
+    snapshotIndex = replaySnapshots.length - 1;
+  }
+
+  if (snapshotView) {
+    snapshotView.textContent = snapshotHumanText(
+      replaySnapshots[snapshotIndex],
+      snapshotIndex,
+      replaySnapshots.length
+    );
+  }
+}
+
+function moveSnapshot(delta) {
+  if (!Array.isArray(replaySnapshots) || replaySnapshots.length === 0) {
+    refreshSnapshotNavigator();
+    return;
+  }
+
+  snapshotIndex += delta;
+
+  if (snapshotIndex < 0) {
+    snapshotIndex = 0;
+  }
+
+  if (snapshotIndex >= replaySnapshots.length) {
+    snapshotIndex = replaySnapshots.length - 1;
+  }
+
+  refreshSnapshotNavigator();
+}
+snapshotPrev.addEventListener("click", () => {
+  moveSnapshot(-1);
+});
+
+snapshotNext.addEventListener("click", () => {
+  moveSnapshot(1);
+});
+
+snapshotLatest.addEventListener("click", () => {
+  refreshSnapshotNavigator();
+  if (replaySnapshots.length > 0) {
+    snapshotIndex = replaySnapshots.length - 1;
+    refreshSnapshotNavigator();
   }
 });
