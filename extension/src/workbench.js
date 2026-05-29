@@ -17,6 +17,7 @@ const freezeBundle = document.getElementById("freezeBundle");
 const certificationReport = document.getElementById("certificationReport");
 const importReplayBundle = document.getElementById("importReplayBundle");
 const importReplayInput = document.getElementById("importReplayInput");
+const exportImportVerify = document.getElementById("exportImportVerify");
 const verifyReplay = document.getElementById("verifyReplay");
 const toggleTechnical = document.getElementById("toggleTechnical");
 const evidenceStatus = document.getElementById("evidenceStatus");
@@ -34,6 +35,7 @@ let lastTimeline = [];
 let technicalVisible = false;
 let lastVerifyResult = null;
 let importedReplayState = null;
+let lastImportVerifyResult = null;
 let replaySnapshots = [];
 let snapshotIndex = -1;
 let lastSnapshotDelta = null;
@@ -597,6 +599,7 @@ verifyReplay.addEventListener("click", async () => {
   refreshEvidenceStatus();
   refreshSnapshotNavigator();
   renderFilmstrip();
+  lastImportVerifyResult = result;
   details.textContent = JSON.stringify(result, null, 2);
 
   if (result.ok) {
@@ -1360,6 +1363,7 @@ function replayReportToOfflineState(report) {
 
 async function importReplayReportObject(report) {
   const verify = await verifyImportedReplay(report);
+  lastImportVerifyResult = verify;
 
   importedReplayState = report;
 
@@ -1526,9 +1530,11 @@ async function verifyBundleFiles(files) {
 
 async function importReplayBundleFiles(files) {
   const result = await verifyBundleFiles(files);
+  lastImportVerifyResult = result;
 
   if (!result.ok) {
-    details.textContent = JSON.stringify(result, null, 2);
+    lastImportVerifyResult = result;
+  details.textContent = JSON.stringify(result, null, 2);
     replay.textContent =
       "Replay bundle verification failed.\n\n" +
       result.failures.join("\n");
@@ -1541,3 +1547,43 @@ async function importReplayBundleFiles(files) {
     "\n\nBundle integrity verified from sha256sums.txt.\nChecked files: " +
     result.checked_files;
 }
+
+async function exportImportVerificationReport() {
+  if (!lastImportVerifyResult) {
+    replay.textContent =
+      "No import verification result is available yet.\n\n" +
+      "Import a replay bundle first, then export the verification report.";
+    return;
+  }
+
+  const envelope = {
+    schema: "haai.import_verification_export.v1",
+    created_utc: new Date().toISOString(),
+    verification: lastImportVerifyResult
+  };
+
+  const body = JSON.stringify(envelope, null, 2);
+  const hash = await sha256Hex(body);
+  envelope.sha256 = hash;
+
+  const finalBody = JSON.stringify(envelope, null, 2);
+  const stamp = envelope.created_utc.replace(/[:.]/g, "-");
+  const filename =
+    "haai_import_verification_" +
+    stamp +
+    "_" +
+    hash.slice(0, 16) +
+    ".json";
+
+  downloadText(filename, finalBody, "application/json");
+
+  replay.textContent =
+    "Import verification report exported.\n\n" +
+    "File: " + filename + "\n" +
+    "SHA-256: " + hash;
+
+  details.textContent = finalBody;
+}
+exportImportVerify.addEventListener("click", async () => {
+  await exportImportVerificationReport();
+});
