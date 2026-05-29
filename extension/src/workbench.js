@@ -834,13 +834,18 @@ importReplayInput.addEventListener("change", async (event) => {
 
   try {
 
-    const file = event.target.files[0];
+    const files = Array.from(event.target.files || []);
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
-    await importReplayReportFile(file);
+    if (files.length > 1 || files.some((file) => file.name === "sha256sums.txt")) {
+      await importReplayBundleFiles(files);
+      return;
+    }
+
+    await importReplayReportFile(files[0]);
 
   } catch (err) {
 
@@ -1353,8 +1358,7 @@ function replayReportToOfflineState(report) {
   };
 }
 
-async function importReplayReportFile(file) {
-  const report = await readJsonFile(file);
+async function importReplayReportObject(report) {
   const verify = await verifyImportedReplay(report);
 
   importedReplayState = report;
@@ -1381,6 +1385,11 @@ async function importReplayReportFile(file) {
   refreshEvidenceStatus();
   refreshSnapshotNavigator();
 }
+
+async function importReplayReportFile(file) {
+  const report = await readJsonFile(file);
+  await importReplayReportObject(report);
+}
 dropZone.addEventListener("dragover", (event) => {
   event.preventDefault();
   dropZone.classList.add("dragOver");
@@ -1394,20 +1403,141 @@ dropZone.addEventListener("drop", async (event) => {
   event.preventDefault();
   dropZone.classList.remove("dragOver");
 
-  const file = event.dataTransfer.files && event.dataTransfer.files[0]
-    ? event.dataTransfer.files[0]
-    : null;
+  const files = Array.from(event.dataTransfer.files || []);
 
-  if (!file) {
-    replay.textContent = "No replay report file was dropped.";
+  if (files.length === 0) {
+    replay.textContent = "No replay report file was dropped."; 
     return;
   }
 
   try {
-    await importReplayReportFile(file);
+    if (files.length > 1 || files.some((file) => file.name === "sha256sums.txt")) {
+      await importReplayBundleFiles(files);
+    } else {
+      await importReplayReportFile(files[0]);
+    }
   } catch (err) {
     replay.textContent =
       "Replay import failed.\n\n" +
       String(err && err.message ? err.message : err);
   }
 });
+
+async function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      resolve(String(reader.result || ""));
+    };
+
+    reader.onerror = () => reject(reader.error);
+
+    reader.readAsText(file);
+  });
+}
+
+function parseSha256Sums(text) {
+  const rows = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  return rows.map((line) => {
+    const match = line.match(/^([a-fA-F0-9]{64})\s+\s*(.+)$/);
+
+    if (!match) {
+      return {
+        ok: false,
+        raw: line,
+        sha256: "",
+        name: ""
+      };
+    }
+
+    return {
+      ok: true,
+      raw: line,
+      sha256: match[1].toLowerCase(),
+      name: match[2]
+    };
+  });
+}
+
+async function verifyBundleFiles(files) {
+  const fileList = Array.from(files || []);
+  const sumsFile = fileList.find((file) => file.name === "sha256sums.txt");
+  const reportFile = fileList.find((file) => file.name === "replay_report.json");
+
+  const failures = [];
+
+  if (!reportFile) {
+    failures.push("MISSING_REPLAY_REPORT_JSON");
+  }
+
+  if (!sumsFile) {
+    failures.push("MISSING_SHA256SUMS_TXT");
+  }
+
+  if (failures.length > 0) {
+    return {
+      ok: false,
+      failures: failures,
+      report: null
+    };
+  }
+
+  const sumsText = await readTextFile(sumsFile);
+  const rows = parseSha256Sums(sumsText);
+
+  rows.forEach((row) => {
+    if (!row.ok) {
+      failures.push("BAD_SHA256SUM_LINE: " + row.raw);
+    }
+  });
+
+  for (const row of rows) {
+    if (!row.ok) { continue; }
+
+    const match = fileList.find((file) => file.name === row.name);
+
+    if (!match) {
+      failures.push("BUNDLE_FILE_MISSING: " + row.name);
+      continue;
+    }
+
+    const body = await readTextFile(match);
+    const actual = await sha256Hex(body);
+
+    if (actual !== row.sha256) {
+      failures.push("HASH_MISMATCH: " + row.name);
+    }
+  }
+
+  const report = await readJsonFile(reportFile);
+
+  return {
+    ok: failures.length === 0,
+    failures: failures,
+    report: report,
+    checked_files: rows.length
+  };
+}
+
+async function importReplayBundleFiles(files) {
+  const result = await verifyBundleFiles(files);
+
+  if (!result.ok) {
+    details.textContent = JSON.stringify(result, null, 2);
+    replay.textContent =
+      "Replay bundle verification failed.\n\n" +
+      result.failures.join("\n");
+    return;
+  }
+
+  await importReplayReportObject(result.report);
+
+  replay.textContent +=
+    "\n\nBundle integrity verified from sha256sums.txt.\nChecked files: " +
+    result.checked_files;
+}
