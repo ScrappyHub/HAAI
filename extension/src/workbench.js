@@ -1587,3 +1587,59 @@ async function exportImportVerificationReport() {
 exportImportVerify.addEventListener("click", async () => {
   await exportImportVerificationReport();
 });
+
+function ensureEvidenceStatusBadge() {
+  let box = document.getElementById("evidenceStatus");
+
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "evidenceStatus";
+    box.className = "statusBox";
+    document.body.insertBefore(box, document.body.firstChild);
+  }
+
+  return box;
+}
+
+function importedBundleStatusText() {
+  if (!lastImportVerifyResult) {
+    return "Imported Bundle: Not checked";
+  }
+
+  const ok = lastImportVerifyResult.ok === true;
+  const failures = Array.isArray(lastImportVerifyResult.failures)
+    ? lastImportVerifyResult.failures.length
+    : 0;
+
+  const checked = typeof lastImportVerifyResult.checked_files === "number"
+    ? lastImportVerifyResult.checked_files
+    : "-";
+
+  return [
+    "Imported Bundle: " + (ok ? "Verified" : "Failed"),
+    "Checked Files: " + checked,
+    "Import Failures: " + failures,
+    "Last Import Check: " + (lastImportVerifyResult.created_utc || "-")
+  ].join("\n");
+}
+
+function refreshImportedBundleBadge() {
+  const box = ensureEvidenceStatusBadge();
+  box.textContent = importedBundleStatusText();
+}
+
+const HAAI_ORIGINAL_importReplayBundleFiles = importReplayBundleFiles;
+importReplayBundleFiles = async function(files) {
+  const result = await HAAI_ORIGINAL_importReplayBundleFiles(files);
+  refreshImportedBundleBadge();
+  return result;
+};
+
+const HAAI_ORIGINAL_importReplayReportFile = importReplayReportFile;
+importReplayReportFile = async function(file) {
+  const result = await HAAI_ORIGINAL_importReplayReportFile(file);
+  refreshImportedBundleBadge();
+  return result;
+};
+
+refreshImportedBundleBadge();
