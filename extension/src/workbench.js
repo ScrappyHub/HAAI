@@ -1765,3 +1765,96 @@ async function exportPacketBundleFiles() {
 exportPacketBundle.addEventListener("click", async () => {
   await exportPacketBundleFiles();
 });
+
+async function verifyCurrentPacketBundle() {
+  const bundle = await buildPacketBundle();
+  const failures = [];
+
+  const manifestText = bundle.files["manifest.json"] || "";
+  const packetIdText = (bundle.files["packet_id.txt"] || "").trim();
+  const shaText = bundle.files["sha256sums.txt"] || "";
+
+  let manifest = null;
+
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch (err) {
+    failures.push("MANIFEST_JSON_INVALID");
+  }
+
+  if (manifest) {
+    const canonical = await canonicalJson(manifest);
+    const expectedPacketId = await sha256HexBytes(canonical);
+
+    if (packetIdText !== expectedPacketId) {
+      failures.push("PACKET_ID_MISMATCH");
+    }
+  }
+
+  const rows = parseSha256Sums(shaText);
+
+  rows.forEach((row) => {
+    if (!row.ok) {
+      failures.push("BAD_SHA256SUM_LINE: " + row.raw);
+    }
+  });
+
+  for (const row of rows) {
+    if (!row.ok) { continue; }
+
+    if (!Object.prototype.hasOwnProperty.call(bundle.files, row.name)) {
+      failures.push("PACKET_FILE_MISSING: " + row.name);
+      continue;
+    }
+
+    const actual = await sha256HexBytes(bundle.files[row.name]);
+
+    if (actual !== row.sha256) {
+      failures.push("PACKET_HASH_MISMATCH: " + row.name);
+    }
+  }
+
+  let replayVerify = null;
+
+  try {
+    replayVerify = JSON.parse(bundle.files["replay_verify.json"] || "{}");
+  } catch (err) {
+    failures.push("REPLAY_VERIFY_JSON_INVALID");
+  }
+
+  if (replayVerify && replayVerify.ok !== true) {
+    failures.push("REPLAY_VERIFY_NOT_OK");
+  }
+
+  return {
+    schema: "haai.packet_verify.v1",
+    created_utc: new Date().toISOString(),
+    ok: failures.length === 0,
+    packet_id: packetIdText,
+    checked_files: rows.length,
+    failure_count: failures.length,
+    failures: failures
+  };
+}
+
+async function runPacketBundleVerification() {
+  const result = await verifyCurrentPacketBundle();
+
+  const body = JSON.stringify(result, null, 2);
+  const hash = await sha256HexBytes(body);
+
+  details.textContent = body;
+
+  replay.textContent =
+    "Packet bundle verification " +
+    (result.ok ? "passed." : "failed.") +
+    "\n\nPacketId: " + result.packet_id +
+    "\nChecked files: " + result.checked_files +
+    "\nFailures: " + result.failure_count +
+    "\nVerification hash: " + hash;
+
+  return result;
+}
+verifyPacketBundle.addEventListener("click", async () => {
+  await runPacketBundleVerification();
+});
