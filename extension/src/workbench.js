@@ -1643,3 +1643,125 @@ importReplayReportFile = async function(file) {
 };
 
 refreshImportedBundleBadge();
+
+async function canonicalJson(value) {
+  return JSON.stringify(sortObject(value));
+}
+
+function sortObject(value) {
+  if (Array.isArray(value)) {
+    return value.map(sortObject);
+  }
+
+  if (value && typeof value === "object") {
+    const out = {};
+
+    Object.keys(value)
+      .sort()
+      .forEach((key) => {
+        out[key] = sortObject(value[key]);
+      });
+
+    return out;
+  }
+
+  return value;
+}
+
+async function sha256HexBytes(text) {
+  const bytes = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function buildPacketManifest(report, verify, timeline) {
+  return {
+    schema: "haai.packet_manifest.v1",
+    created_utc: new Date().toISOString(),
+    provider: report.provider || "unknown",
+    session_id: report.session_id || "",
+    replay_event_count: report.event_count || 0,
+    replay_snapshot_count: report.snapshot_event_count || 0,
+    replay_verify_ok: verify && verify.ok === true,
+    timeline_count: Array.isArray(timeline) ? timeline.length : 0,
+    files: [
+      "manifest.json",
+      "packet_id.txt",
+      "replay_report.json",
+      "replay_verify.json",
+      "replay_timeline.json",
+      "sha256sums.txt"
+    ]
+  };
+}
+
+async function buildPacketBundle() {
+  const report = replayReportObject(lastState || {}, lastTimeline || []);
+  const verify = await verifyCurrentReplay(lastState || {});
+  const timeline = Array.isArray(lastTimeline) ? lastTimeline : [];
+
+  const manifest = await buildPacketManifest(report, verify, timeline);
+
+  const manifestCanonical = await canonicalJson(manifest);
+  const packetId = await sha256HexBytes(manifestCanonical);
+
+  const replayReportText = JSON.stringify(report, null, 2);
+  const replayVerifyText = JSON.stringify(verify, null, 2);
+  const replayTimelineText = JSON.stringify(timeline, null, 2);
+  const manifestText = JSON.stringify(manifest, null, 2);
+
+  const packetIdText = packetId;
+
+  const fileMap = {
+    "manifest.json": manifestText,
+    "packet_id.txt": packetIdText,
+    "replay_report.json": replayReportText,
+    "replay_verify.json": replayVerifyText,
+    "replay_timeline.json": replayTimelineText
+  };
+
+  const shaRows = [];
+
+  for (const name of Object.keys(fileMap).sort()) {
+    const hash = await sha256HexBytes(fileMap[name]);
+    shaRows.push(hash + "  " + name);
+  }
+
+  const shaText = shaRows.join("\n");
+
+  fileMap["sha256sums.txt"] = shaText;
+
+  return {
+    packet_id: packetId,
+    files: fileMap
+  };
+}
+
+async function exportPacketBundleFiles() {
+  const bundle = await buildPacketBundle();
+
+  for (const name of Object.keys(bundle.files)) {
+    const filename =
+      "haai_packet_" +
+      bundle.packet_id.slice(0,16) +
+      "/" +
+      name;
+
+    downloadText(
+      filename,
+      bundle.files[name],
+      "application/json"
+    );
+  }
+
+  replay.textContent =
+    "HAAI packet bundle exported.\n\n" +
+    "PacketId: " + bundle.packet_id + "\n" +
+    "Files: " + Object.keys(bundle.files).length;
+}
+exportPacketBundle.addEventListener("click", async () => {
+  await exportPacketBundleFiles();
+});
