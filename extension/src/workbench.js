@@ -41,6 +41,7 @@ let snapshotIndex = -1;
 let lastSnapshotDelta = null;
 let lastArchive = [];
 let compareSelection = [];
+let haaiRuntimeState = null;
 
 async function sha256Hex(text) {
   const bytes = new TextEncoder().encode(text);
@@ -453,6 +454,7 @@ function buildReplayText(state) {
 function render(data) {
   lastState = data.state || {};
   refreshEvidenceStatus();
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
   renderFilmstrip();
   lastTimeline = Array.isArray(data.timeline) ? data.timeline : [];
@@ -597,6 +599,7 @@ verifyReplay.addEventListener("click", async () => {
   const result = await verifyCurrentReplay(lastState || {});
   lastVerifyResult = result;
   refreshEvidenceStatus();
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
   renderFilmstrip();
   lastImportVerifyResult = result;
@@ -650,6 +653,7 @@ toggleTechnical.addEventListener("click", () => {
 refresh.addEventListener("click", load);
 setTechnicalVisible(false);
 refreshEvidenceStatus();
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
   renderFilmstrip();
 load();
@@ -936,7 +940,8 @@ function refreshSnapshotNavigator() {
 
 function moveSnapshot(delta) {
   if (!Array.isArray(replaySnapshots) || replaySnapshots.length === 0) {
-    refreshSnapshotNavigator();
+    refreshRuntimeState("live", "workbench");
+  refreshSnapshotNavigator();
   renderFilmstrip();
     return;
   }
@@ -951,6 +956,7 @@ function moveSnapshot(delta) {
     snapshotIndex = replaySnapshots.length - 1;
   }
 
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
   renderFilmstrip();
 }
@@ -963,11 +969,13 @@ snapshotNext.addEventListener("click", () => {
 });
 
 snapshotLatest.addEventListener("click", () => {
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
   renderFilmstrip();
   if (replaySnapshots.length > 0) {
     snapshotIndex = replaySnapshots.length - 1;
-    refreshSnapshotNavigator();
+    refreshRuntimeState("live", "workbench");
+  refreshSnapshotNavigator();
   renderFilmstrip();
   }
 });
@@ -1042,6 +1050,7 @@ function compareSnapshots(left, right) {
 }
 
 function compareCurrentSnapshotWithPrevious() {
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
   renderFilmstrip();
 
@@ -1316,7 +1325,8 @@ function renderFilmstrip() {
 
       snapshotIndex = index;
 
-      refreshSnapshotNavigator();
+      refreshRuntimeState("live", "workbench");
+  refreshSnapshotNavigator();
   renderFilmstrip();
       renderFilmstrip();
     });
@@ -1379,7 +1389,8 @@ async function importReplayReportObject(report) {
       "\n\nImported replay verification failed:\n" +
       verify.failures.join("\n");
     refreshEvidenceStatus();
-    refreshSnapshotNavigator();
+    refreshRuntimeState("live", "workbench");
+  refreshSnapshotNavigator();
     return;
   }
 
@@ -1387,6 +1398,7 @@ async function importReplayReportObject(report) {
     "\n\nImported replay is loaded for offline inspection.";
 
   refreshEvidenceStatus();
+  refreshRuntimeState("live", "workbench");
   refreshSnapshotNavigator();
 }
 
@@ -1858,3 +1870,84 @@ async function runPacketBundleVerification() {
 verifyPacketBundle.addEventListener("click", async () => {
   await runPacketBundleVerification();
 });
+
+function buildRuntimeState(source, options) {
+  const opts = options || {};
+  const state = source || {};
+  const events = Array.isArray(state.events) ? state.events : [];
+  const surface = state.surface || {};
+
+  const snapshots = events.filter((event) => {
+    return event && event.event_type === "conversation_snapshot" && event.payload;
+  });
+
+  const inputEvents = events.filter((event) => {
+    return event && event.event_type === "input_surface_changed";
+  });
+
+  const timeline = Array.isArray(lastTimeline) ? lastTimeline : [];
+
+  return {
+    schema: "haai.runtime_state.v1",
+    created_utc: new Date().toISOString(),
+    mode: opts.mode || "live",
+    source: opts.source || "workbench",
+    imported: Boolean(opts.imported),
+    verified: lastVerifyResult ? Boolean(lastVerifyResult.ok) : false,
+    import_verified: lastImportVerifyResult ? Boolean(lastImportVerifyResult.ok) : false,
+    session_id: state.session_id || "",
+    provider: surface.provider || "unknown",
+    domain: surface.domain || "",
+    title: surface.title || "",
+    active_capture: Boolean(state.active_capture),
+    session_started_utc: state.session_started_utc || "",
+    session_stopped_utc: state.session_stopped_utc || "",
+    last_activity_utc: state.last_activity_utc || "",
+    event_count: events.length,
+    snapshot_count: snapshots.length,
+    input_event_count: inputEvents.length,
+    timeline_count: timeline.length,
+    current_snapshot_index: snapshotIndex,
+    current_packet_id: "",
+    surface: surface,
+    lifecycle: state.lifecycle || {},
+    snapshots: snapshots,
+    input_events: inputEvents,
+    timeline: timeline
+  };
+}
+
+function refreshRuntimeState(mode, source) {
+  const runtimeSource = activeReplaySource ? activeReplaySource() : (lastState || {});
+
+  haaiRuntimeState = buildRuntimeState(runtimeSource, {
+    mode: mode || "live",
+    source: source || "workbench",
+    imported: Boolean(importedReplayState)
+  });
+
+  return haaiRuntimeState;
+}
+
+function runtimeSummaryText(runtime) {
+  const rt = runtime || haaiRuntimeState || refreshRuntimeState();
+
+  return [
+    "HAAI Runtime State",
+    "",
+    "Mode: " + (rt.mode || "-"),
+    "Source: " + (rt.source || "-"),
+    "Provider: " + (rt.provider || "unknown"),
+    "Domain: " + (rt.domain || "-"),
+    "Title: " + (rt.title || "Untitled"),
+    "Session: " + (rt.session_id || "-"),
+    "",
+    "Events: " + rt.event_count,
+    "Snapshots: " + rt.snapshot_count,
+    "Input changes: " + rt.input_event_count,
+    "Timeline captures: " + rt.timeline_count,
+    "",
+    "Replay verified: " + (rt.verified ? "yes" : "not yet"),
+    "Import verified: " + (rt.import_verified ? "yes" : "not yet")
+  ].join("\n");
+}
