@@ -1951,3 +1951,52 @@ function runtimeSummaryText(runtime) {
     "Import verified: " + (rt.import_verified ? "yes" : "not yet")
   ].join("\n");
 }
+
+async function exportRuntimeStateArtifact() {
+
+  const runtime = refreshRuntimeState(
+    importedReplayState ? "imported" : "live",
+    importedReplayState ? "offline_bundle" : "workbench"
+  );
+
+  const body = JSON.stringify(runtime, null, 2);
+
+  const hash = await sha256HexBytes(body);
+
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
+
+  const envelope = {
+    schema: "haai.runtime_state_export.v1",
+    created_utc: new Date().toISOString(),
+    sha256: hash,
+    runtime_state: runtime
+  };
+
+  const finalBody = JSON.stringify(envelope, null, 2);
+
+  const filename =
+    "haai_runtime_state_" +
+    stamp +
+    "_" +
+    hash.slice(0,16) +
+    ".json";
+
+  downloadText(
+    filename,
+    finalBody,
+    "application/json"
+  );
+
+  replay.textContent =
+    "Runtime state exported.\n\n" +
+    "Schema: " + runtime.schema + "\n" +
+    "Provider: " + runtime.provider + "\n" +
+    "Events: " + runtime.event_count + "\n" +
+    "Snapshots: " + runtime.snapshot_count + "\n" +
+    "SHA-256: " + hash;
+}
+exportRuntimeState.addEventListener("click", async () => {
+  await exportRuntimeStateArtifact();
+});
