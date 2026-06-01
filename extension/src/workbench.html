@@ -4,96 +4,192 @@
   <meta charset="utf-8">
   <title>HAAI Workbench</title>
   <style>
-    body { margin: 0; background: #08111f; color: #e5e7eb; font-family: Segoe UI, system-ui, sans-serif; }
-    header { padding: 22px 28px; border-bottom: 1px solid #1f2937; background: #0f172a; }
-    h1 { margin: 0; font-size: 24px; }
-    h2 { margin-top: 0; }
-    .sub { color: #93c5fd; margin-top: 6px; }
-    main { padding: 22px 28px; display: grid; grid-template-columns: 330px 1fr; gap: 18px; }
-    .card { background: #111827; border: 1px solid #334155; border-radius: 16px; padding: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.25); }
-    .stat { font-size: 26px; font-weight: 800; }
-    .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-    button { border: 0; border-radius: 10px; padding: 10px 12px; background: #38bdf8; color: #020617; font-weight: 800; cursor: pointer; }
-    .timeline { display: grid; gap: 10px; }
-    .item { padding: 12px; border: 1px solid #334155; border-radius: 12px; background: #020617; cursor: pointer; }
-    .item:hover { border-color: #38bdf8; }
-    .item strong { color: #bfdbfe; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
-    .mini { background: #020617; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
-    .mini strong { display: block; font-size: 22px; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #020617; border: 1px solid #334155; border-radius: 12px; padding: 12px; min-height: 220px; }
-    .muted { color: #94a3b8; }
-  .statusBox {
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 14px;
-  padding: 12px;
-  margin-bottom: 14px;
-  background: rgba(255,255,255,0.04);
-  line-height: 1.45;
-}
-.filmstrip {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding: 10px 0;
-  margin-bottom: 16px;
-}
+  :root {
+    --bg: #07111f;
+    --panel: #101b2d;
+    --panel2: #0b1424;
+    --border: #263a57;
+    --text: #f4f8ff;
+    --muted: #9db0c9;
+    --blue: #38bdf8;
+    --blueSoft: rgba(56,189,248,0.12);
+    --green: #22c55e;
+    --red: #ef4444;
+  }
 
-.snapshotCard {
-  min-width: 220px;
-  max-width: 220px;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 14px;
-  padding: 12px;
-  background: rgba(255,255,255,0.04);
-  cursor: pointer;
-  transition: transform 0.12s ease;
-}
+  * { box-sizing: border-box; }
 
-.snapshotCard:hover {
-  transform: translateY(-2px);
-}
+  body {
+    margin: 0;
+    padding: 24px;
+    background: radial-gradient(circle at top left, #10213b, var(--bg) 38%);
+    color: var(--text);
+    font-family: Inter, Segoe UI, Arial, sans-serif;
+  }
 
-.snapshotCard.active {
-  border-color: #7dd3fc;
-  background: rgba(125,211,252,0.08);
-}
+  h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    letter-spacing: -0.03em;
+  }
 
-.snapshotTitle {
-  font-weight: bold;
-  margin-bottom: 8px;
-}
+  h2 {
+    margin: 20px 0 10px;
+    font-size: 17px;
+  }
 
-.snapshotMeta {
-  opacity: 0.82;
-  font-size: 12px;
-  line-height: 1.45;
-}
+  .subtle, p {
+    color: var(--muted);
+  }
 
-.snapshotDelta {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #7dd3fc;
-}
-.dropZone {
-  border: 1px dashed rgba(255,255,255,0.28);
-  border-radius: 14px;
-  padding: 12px;
-  margin: 10px 0 12px 0;
-  background: rgba(255,255,255,0.03);
-  font-size: 13px;
-  opacity: 0.9;
-}
-.dropZone.dragOver {
-  border-color: #7dd3fc;
-  background: rgba(125,211,252,0.08);
-}
+  .shell {
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+
+  .topbar {
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px;
+    background: rgba(255,255,255,0.04);
+    margin-bottom: 18px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    background: rgba(255,255,255,0.035);
+    box-shadow: 0 14px 50px rgba(0,0,0,0.22);
+  }
+
+  .statusBox, .dropZone {
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 14px;
+    background: rgba(255,255,255,0.04);
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+
+  .dropZone {
+    border-style: dashed;
+    color: var(--muted);
+  }
+
+  .dropZone.dragOver {
+    border-color: var(--blue);
+    background: var(--blueSoft);
+    color: var(--text);
+  }
+
+  button {
+    appearance: none;
+    border: none;
+    border-radius: 11px;
+    padding: 10px 12px;
+    margin: 4px;
+    background: var(--blue);
+    color: #02111f;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  button:hover { filter: brightness(1.05); }
+
+  .buttonBank {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .buttonBank button {
+    width: 100%;
+    margin: 0;
+  }
+
+  .filmstrip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 10px 0;
+    margin-bottom: 16px;
+  }
+
+  .snapshotCard {
+    min-width: 220px;
+    max-width: 220px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    padding: 12px;
+    background: rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+
+  .snapshotCard:hover { transform: translateY(-2px); }
+
+  .snapshotCard.active {
+    border-color: var(--blue);
+    background: var(--blueSoft);
+  }
+
+  .snapshotTitle {
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .snapshotMeta {
+    opacity: 0.82;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .snapshotDelta {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--blue);
+  }
+
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #050b18;
+    color: #dbeafe;
+    padding: 12px;
+    line-height: 1.45;
+    max-height: 420px;
+    overflow: auto;
+  }
+
+  #details {
+    display: none;
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 </head>
 <body>
+<div class="shell">
   <header>
-    <h1>HAAI Replay & Evidence Workbench</h1>
-    <div class="sub">Local-first AI session evidence timeline and replay inspector.</div>
+    <div class="topbar">
+<h1>HAAI Replay & Evidence Workbench</h1>
+    <div class="sub">Local-first AI session evidence timeline and replay inspector.
+</div></div>
   </header>
 
   <main>
@@ -169,5 +265,6 @@
   style="display:none"
 />
 
+</div>
 </body>
 </html>
