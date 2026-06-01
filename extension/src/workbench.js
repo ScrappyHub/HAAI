@@ -1873,6 +1873,20 @@ verifyPacketBundle.addEventListener("click", async () => {
 
 function buildRuntimeState(source, options) {
   const opts = options || {};
+
+  if (window.HAAIRuntimeCore && typeof window.HAAIRuntimeCore.buildRuntimeState === "function") {
+    return window.HAAIRuntimeCore.buildRuntimeState(source || {}, {
+      mode: opts.mode || "live",
+      source: opts.source || "workbench",
+      imported: Boolean(opts.imported),
+      verified: lastVerifyResult ? Boolean(lastVerifyResult.ok) : false,
+      import_verified: lastImportVerifyResult ? Boolean(lastImportVerifyResult.ok) : false,
+      timeline: Array.isArray(lastTimeline) ? lastTimeline : [],
+      current_snapshot_index: snapshotIndex,
+      current_packet_id: opts.current_packet_id || ""
+    });
+  }
+
   const state = source || {};
   const events = Array.isArray(state.events) ? state.events : [];
   const surface = state.surface || {};
