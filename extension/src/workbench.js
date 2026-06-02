@@ -10,6 +10,7 @@ const eventCount = document.getElementById("eventCount");
 const inputCount = document.getElementById("inputCount");
 const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
+const systemCheck = document.getElementById("systemCheck");
 const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
@@ -2013,4 +2014,70 @@ async function exportRuntimeStateArtifact() {
 }
 exportRuntimeState.addEventListener("click", async () => {
   await exportRuntimeStateArtifact();
+});
+
+async function runSystemCheck() {
+  const checks = [];
+
+  checks.push({
+    name: "Runtime core loaded",
+    ok: Boolean(window.HAAIRuntimeCore && window.HAAIRuntimeCore.version),
+    detail: window.HAAIRuntimeCore ? window.HAAIRuntimeCore.version : "missing"
+  });
+
+  checks.push({
+    name: "Runtime state builder available",
+    ok: Boolean(window.HAAIRuntimeCore && typeof window.HAAIRuntimeCore.buildRuntimeState === "function"),
+    detail: "haai.runtime_state.v1"
+  });
+
+  checks.push({
+    name: "Packet bundle builder available",
+    ok: typeof buildPacketBundle === "function",
+    detail: "packet export"
+  });
+
+  checks.push({
+    name: "Packet bundle verifier available",
+    ok: typeof verifyCurrentPacketBundle === "function",
+    detail: "packet verify"
+  });
+
+  checks.push({
+    name: "Import verifier available",
+    ok: typeof verifyBundleFiles === "function",
+    detail: "sha256sums import verify"
+  });
+
+  checks.push({
+    name: "Replay snapshots available",
+    ok: Array.isArray(replaySnapshots),
+    detail: String(Array.isArray(replaySnapshots) ? replaySnapshots.length : 0)
+  });
+
+  const passed = checks.filter((row) => row.ok).length;
+
+  const report = {
+    schema: "haai.system_check.v1",
+    created_utc: new Date().toISOString(),
+    ok: passed === checks.length,
+    passed: passed,
+    total: checks.length,
+    checks: checks
+  };
+
+  details.textContent = JSON.stringify(report, null, 2);
+
+  replay.textContent =
+    "HAAI System Check\n\n" +
+    "Status: " + (report.ok ? "PASS" : "REVIEW") + "\n" +
+    "Passed: " + report.passed + " / " + report.total + "\n\n" +
+    checks.map((row) => {
+      return (row.ok ? "PASS: " : "REVIEW: ") + row.name + " - " + row.detail;
+    }).join("\n");
+
+  return report;
+}
+systemCheck.addEventListener("click", async () => {
+  await runSystemCheck();
 });
