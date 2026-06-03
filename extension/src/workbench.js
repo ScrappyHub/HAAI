@@ -12,6 +12,10 @@ const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
 const systemCheck = document.getElementById("systemCheck");
 const exportSystemCheck = document.getElementById("exportSystemCheck");
+const reviewReplay = document.getElementById("reviewReplay");
+const certifyReplay = document.getElementById("certifyReplay");
+const exportCertification = document.getElementById("exportCertification");
+const verifyCertification = document.getElementById("verifyCertification");
 const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
@@ -45,6 +49,7 @@ let lastArchive = [];
 let compareSelection = [];
 let haaiRuntimeState = null;
 let lastSystemCheckReport = null;
+let lastReplayCertification = null;
 
 async function sha256Hex(text) {
   const bytes = new TextEncoder().encode(text);
@@ -2116,4 +2121,229 @@ async function exportSystemCheckReport() {
 }
 exportSystemCheck.addEventListener("click", async () => {
   await exportSystemCheckReport();
+});
+
+function currentReplayRuntime() {
+  return refreshRuntimeState(
+    importedReplayState ? "imported" : "live",
+    importedReplayState ? "offline_bundle" : "workbench"
+  );
+}
+
+function replayReviewSummaryText(runtime) {
+  const rt = runtime || currentReplayRuntime();
+
+  const replayPass = lastVerifyResult
+    ? Boolean(lastVerifyResult.ok)
+    : false;
+
+  const importPass = lastImportVerifyResult
+    ? Boolean(lastImportVerifyResult.ok)
+    : false;
+
+  return [
+    "Replay Review Summary",
+    "",
+    "Provider: " + (rt.provider || "unknown"),
+    "Domain: " + (rt.domain || "-"),
+    "Title: " + (rt.title || "Untitled"),
+    "Session: " + (rt.session_id || "-"),
+    "",
+    "Events reviewed: " + rt.event_count,
+    "Snapshots reviewed: " + rt.snapshot_count,
+    "Input changes reviewed: " + rt.input_event_count,
+    "",
+    "Replay verification: " + (replayPass ? "PASS" : "NOT VERIFIED"),
+    "Bundle verification: " + (importPass ? "PASS" : "NOT VERIFIED"),
+    "",
+    replayPass || importPass
+      ? "No integrity failure is currently selected in the Workbench."
+      : "Verify the replay or imported bundle before external certification."
+  ].join("\n");
+}
+
+async function reviewCurrentReplay() {
+  const runtime = currentReplayRuntime();
+  const summary = replayReviewSummaryText(runtime);
+
+  replay.textContent = summary;
+  details.textContent = JSON.stringify(runtime, null, 2);
+
+  return runtime;
+}
+
+async function certifyCurrentReplay() {
+  const runtime = currentReplayRuntime();
+
+  const runtimeText = JSON.stringify(runtime, null, 2);
+  const runtimeHash = await sha256HexBytes(runtimeText);
+
+  const replayBasis = {
+    session_id: runtime.session_id,
+    provider: runtime.provider,
+    domain: runtime.domain,
+    event_count: runtime.event_count,
+    snapshot_count: runtime.snapshot_count,
+    input_event_count: runtime.input_event_count,
+    runtime_state_hash: runtimeHash
+  };
+
+  const replayHash = await sha256HexBytes(JSON.stringify(replayBasis, null, 2));
+
+  const verificationPass =
+    (lastVerifyResult && lastVerifyResult.ok === true) ||
+    (lastImportVerifyResult && lastImportVerifyResult.ok === true);
+
+  const created = new Date().toISOString();
+
+  const draft = {
+    schema: "haai.replay_certification.v1",
+    certification_id: "cert_" + created.replace(/[:.]/g, "-"),
+    created_utc: created,
+    reviewer: "Local Operator",
+    verification_result: verificationPass ? "PASS" : "NOT_VERIFIED",
+    replay_hash: replayHash,
+    runtime_state_hash: runtimeHash,
+    reviewed_event_count: runtime.event_count,
+    reviewed_snapshot_count: runtime.snapshot_count,
+    reviewed_input_event_count: runtime.input_event_count,
+    source_packet_id: runtime.current_packet_id || "",
+    review_notes: verificationPass
+      ? "Replay reviewed in HAAI Workbench. No selected integrity failure detected."
+      : "Replay reviewed in HAAI Workbench. Verification was not completed before certification."
+  };
+
+  const withoutHash = JSON.stringify(draft, null, 2);
+  draft.certification_hash = await sha256HexBytes(withoutHash);
+
+  lastReplayCertification = draft;
+
+  replay.textContent = [
+    "Replay Certification Created",
+    "",
+    "Reviewer: " + draft.reviewer,
+    "Status: " + draft.verification_result,
+    "",
+    "Events Reviewed: " + draft.reviewed_event_count,
+    "Snapshots Reviewed: " + draft.reviewed_snapshot_count,
+    "Input Changes Reviewed: " + draft.reviewed_input_event_count,
+    "",
+    "Certification ready for export."
+  ].join("\n");
+
+  details.textContent = JSON.stringify(draft, null, 2);
+
+  return draft;
+}
+
+async function exportReplayCertification() {
+  if (!lastReplayCertification) {
+    await certifyCurrentReplay();
+  }
+
+  const cert = lastReplayCertification;
+  const envelope = {
+    schema: "haai.replay_certification_export.v1",
+    created_utc: new Date().toISOString(),
+    certification: cert
+  };
+
+  const body = JSON.stringify(envelope, null, 2);
+  const hash = await sha256HexBytes(body);
+  envelope.sha256 = hash;
+
+  const finalBody = JSON.stringify(envelope, null, 2);
+  const stamp = envelope.created_utc.replace(/[:.]/g, "-");
+  const filename =
+    "haai_replay_certification_" +
+    stamp +
+    "_" +
+    hash.slice(0, 16) +
+    ".json";
+
+  downloadText(filename, finalBody, "application/json");
+
+  replay.textContent =
+    "Replay certification exported.\n\n" +
+    "File: " + filename + "\n" +
+    "SHA-256: " + hash;
+
+  details.textContent = finalBody;
+}
+
+async function verifyReplayCertificationObject(cert) {
+  const failures = [];
+
+  if (!cert) {
+    failures.push("MISSING_CERTIFICATION");
+  }
+
+  if (cert && cert.schema !== "haai.replay_certification.v1") {
+    failures.push("BAD_SCHEMA");
+  }
+
+  ["certification_id", "created_utc", "reviewer", "verification_result", "replay_hash", "runtime_state_hash", "certification_hash"].forEach((field) => {
+    if (!cert || !cert[field]) {
+      failures.push("MISSING_" + field.toUpperCase());
+    }
+  });
+
+  if (cert && !["PASS", "NOT_VERIFIED", "FAIL"].includes(cert.verification_result)) {
+    failures.push("BAD_VERIFICATION_RESULT");
+  }
+
+  if (cert && cert.certification_hash) {
+    const clone = Object.assign({}, cert);
+    const expected = clone.certification_hash;
+    delete clone.certification_hash;
+
+    const actual = await sha256HexBytes(JSON.stringify(clone, null, 2));
+
+    if (actual !== expected) {
+      failures.push("CERTIFICATION_HASH_MISMATCH");
+    }
+  }
+
+  return {
+    schema: "haai.replay_certification_verify.v1",
+    created_utc: new Date().toISOString(),
+    ok: failures.length === 0,
+    failure_count: failures.length,
+    failures: failures,
+    certification_id: cert && cert.certification_id ? cert.certification_id : ""
+  };
+}
+
+async function verifyCurrentReplayCertification() {
+  const result = await verifyReplayCertificationObject(lastReplayCertification);
+
+  replay.textContent = [
+    "Replay Certification Verification",
+    "",
+    result.ok ? "PASS" : "FAIL",
+    "",
+    result.ok
+      ? "Certification integrity verified."
+      : "Certification verification failures:",
+    result.ok ? "" : result.failures.join("\n")
+  ].join("\n");
+
+  details.textContent = JSON.stringify(result, null, 2);
+
+  return result;
+}
+reviewReplay.addEventListener("click", async () => {
+  await reviewCurrentReplay();
+});
+
+certifyReplay.addEventListener("click", async () => {
+  await certifyCurrentReplay();
+});
+
+exportCertification.addEventListener("click", async () => {
+  await exportReplayCertification();
+});
+
+verifyCertification.addEventListener("click", async () => {
+  await verifyCurrentReplayCertification();
 });
