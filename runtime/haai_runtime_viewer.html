@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HAAI Runtime Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #07111f;
+      color: #f4f8ff;
+      font-family: Segoe UI, Arial, sans-serif;
+    }
+
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .topbar, .panel {
+      border: 1px solid #263a57;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+
+    .muted {
+      color: #9db0c9;
+    }
+
+    button {
+      border: none;
+      border-radius: 11px;
+      padding: 10px 12px;
+      background: #38bdf8;
+      color: #02111f;
+      font-weight: 800;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+
+    .dropZone {
+      border: 1px dashed rgba(255,255,255,0.28);
+      border-radius: 14px;
+      padding: 16px;
+      color: #9db0c9;
+      margin-top: 12px;
+    }
+
+    .dropZone.dragOver {
+      border-color: #38bdf8;
+      background: rgba(56,189,248,0.12);
+      color: #f4f8ff;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #050b18;
+      border: 1px solid #263a57;
+      border-radius: 14px;
+      padding: 12px;
+      max-height: 520px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <h1>HAAI Runtime Viewer</h1>
+      <div class="muted">Standalone local viewer for HAAI replay, runtime-state, and packet evidence artifacts.</div>
+    </div>
+
+    <div class="panel">
+      <button id="openRuntime">Open Runtime State</button>
+      <button id="openReplayReport">Open Replay Report</button>
+      <button id="systemCheck">Runtime System Check</button>
+
+      <div id="dropZone" class="dropZone">
+        Drop a HAAI runtime_state_export.json or replay_report.json here.
+      </div>
+
+      <input id="fileInput" type="file" accept=".json,.txt" style="display:none">
+    </div>
+
+    <div class="panel">
+      <h2>Runtime Summary</h2>
+      <pre id="summary">No runtime artifact loaded yet.</pre>
+    </div>
+
+    <div class="panel">
+      <h2>Technical Evidence</h2>
+      <pre id="details">Technical details appear here after import.</pre>
+    </div>
+  </div>
+
+  <script src="../extension/src/runtime_core.js"></script>
+  <script src="haai_runtime_viewer.js"></script>
+</body>
+</html>
