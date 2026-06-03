@@ -11,6 +11,7 @@ const inputCount = document.getElementById("inputCount");
 const snapshotCount = document.getElementById("snapshotCount");
 const refresh = document.getElementById("refresh");
 const systemCheck = document.getElementById("systemCheck");
+const exportSystemCheck = document.getElementById("exportSystemCheck");
 const exportReport = document.getElementById("exportReport");
 const compareReplay = document.getElementById("compareReplay");
 const exportHistory = document.getElementById("exportHistory");
@@ -43,6 +44,7 @@ let lastSnapshotDelta = null;
 let lastArchive = [];
 let compareSelection = [];
 let haaiRuntimeState = null;
+let lastSystemCheckReport = null;
 
 async function sha256Hex(text) {
   const bytes = new TextEncoder().encode(text);
@@ -2066,6 +2068,7 @@ async function runSystemCheck() {
     checks: checks
   };
 
+  lastSystemCheckReport = report;
   details.textContent = JSON.stringify(report, null, 2);
 
   replay.textContent =
@@ -2080,4 +2083,37 @@ async function runSystemCheck() {
 }
 systemCheck.addEventListener("click", async () => {
   await runSystemCheck();
+});
+
+async function exportSystemCheckReport() {
+  const report = lastSystemCheckReport || await runSystemCheck();
+
+  const body = JSON.stringify(report, null, 2);
+  const hash = await sha256HexBytes(body);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  const envelope = {
+    schema: "haai.system_check_export.v1",
+    created_utc: new Date().toISOString(),
+    sha256: hash,
+    report: report
+  };
+
+  const finalBody = JSON.stringify(envelope, null, 2);
+  const filename =
+    "haai_system_check_" +
+    stamp +
+    "_" +
+    hash.slice(0, 16) +
+    ".json";
+
+  downloadText(filename, finalBody, "application/json");
+
+  replay.textContent =
+    "System check report exported.\n\n" +
+    "File: " + filename + "\n" +
+    "SHA-256: " + hash;
+}
+exportSystemCheck.addEventListener("click", async () => {
+  await exportSystemCheckReport();
 });
