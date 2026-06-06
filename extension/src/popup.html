@@ -4,173 +4,25 @@
   <meta charset="utf-8">
   <title>HAAI Recorder</title>
   <style>
-    :root {
-      --bg: #08111f;
-      --panel: #101b2d;
-      --panel2: #0b1424;
-      --border: #263a57;
-      --text: #f4f8ff;
-      --muted: #9db0c9;
-      --blue: #38bdf8;
-      --blue2: #2563eb;
-      --red: #ef4444;
-      --green: #22c55e;
-      --disabled: #475569;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 410px;
-      margin: 0;
-      padding: 16px;
-      background: var(--bg);
-      color: var(--text);
-      font-family: Inter, Segoe UI, Arial, sans-serif;
-      font-size: 13px;
-    }
-
-    .header {
-      margin-bottom: 14px;
-    }
-
-    .title {
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin-bottom: 4px;
-    }
-
-    .subtitle {
-      color: var(--muted);
-      line-height: 1.35;
-    }
-
-    .statusCard {
-      border: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-      border-radius: 16px;
-      padding: 12px;
-      margin-bottom: 14px;
-    }
-
-    .badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-weight: 750;
-      font-size: 12px;
-      background: #172554;
-      color: #dbeafe;
-    }
-
-    .badge.red {
-      background: #7f1d1d;
-      color: #fee2e2;
-    }
-
-    .badge.green {
-      background: #14532d;
-      color: #dcfce7;
-    }
-
-    .meta {
-      color: var(--muted);
-      line-height: 1.55;
-    }
-
-    .buttonGrid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-      margin-bottom: 10px;
-    }
-
-    .buttonStack {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 9px;
-      margin-bottom: 12px;
-    }
-
-    button {
-      appearance: none;
-      border: none;
-      border-radius: 11px;
-      padding: 12px 10px;
-      background: var(--blue);
-      color: #02111f;
-      font-weight: 800;
-      cursor: pointer;
-      transition: transform 0.08s ease, opacity 0.12s ease, background 0.12s ease;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-    }
-
-    button:disabled {
-      background: var(--disabled);
-      color: #cbd5e1;
-      cursor: not-allowed;
-      transform: none;
-      opacity: 0.8;
-    }
-
-    .secondary {
-      background: #1e293b;
-      color: #e2e8f0;
-      border: 1px solid var(--border);
-    }
-
-    .outputLabel {
-      display: flex;
-      justify-content: space-between;
-      color: var(--muted);
-      margin: 8px 2px 6px;
-      font-size: 12px;
-    }
-
-    textarea {
-      width: 100%;
-      height: 175px;
-      resize: vertical;
-      border-radius: 14px;
-      padding: 12px;
-      background: #050b18;
-      border: 1px solid var(--border);
-      color: #dbeafe;
-      font-family: Consolas, ui-monospace, monospace;
-      font-size: 12px;
-      line-height: 1.45;
-      outline: none;
-    }
-
-    .hint {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.35;
-    }
+    body{width:410px;margin:0;padding:16px;background:#08111f;color:#f4f8ff;font-family:Segoe UI,Arial,sans-serif}
+    .title{font-size:22px;font-weight:800;margin-bottom:6px}.subtitle{color:#9db0c9;margin-bottom:16px}
+    .card{border:1px solid #263a57;border-radius:16px;padding:14px;background:#101b2d;margin-bottom:14px}
+    .badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.badge{border-radius:999px;padding:7px 12px;font-weight:800;background:#172554}
+    .red{background:#991b1b}.green{background:#166534}.meta{color:#bfdbfe;line-height:1.5}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stack{display:grid;gap:10px;margin-top:10px}
+    button{border:0;border-radius:12px;padding:13px;background:#38bdf8;color:#02111f;font-weight:800;cursor:pointer}
+    button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #263a57}
+    button:disabled{background:#475569;color:#cbd5e1;cursor:not-allowed}
+    .label{display:flex;justify-content:space-between;color:#bfdbfe;margin:16px 2px 8px}
+    textarea{width:100%;height:170px;border-radius:14px;padding:12px;background:#050b18;color:#dbeafe;border:1px solid #263a57;font-family:Consolas,monospace}
+    .hint{margin-top:10px;color:#9db0c9;font-size:12px;line-height:1.4}
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="title">HAAI Recorder</div>
-    <div class="subtitle">Local-first AI evidence recorder and replay capture adapter.</div>
-  </div>
+  <div class="title">HAAI Recorder</div>
+  <div class="subtitle">Local-first AI evidence recorder and replay capture adapter.</div>
 
-  <div class="statusCard">
+  <div class="card">
     <div class="badges">
       <span id="captureBadge" class="badge red">Inactive</span>
       <span id="surfaceBadge" class="badge">AI surface: unknown</span>
@@ -178,7 +30,7 @@
     <div id="metaLine" class="meta">Open an AI page and click Check.</div>
   </div>
 
-  <div class="buttonGrid">
+  <div class="grid">
     <button id="check">Check</button>
     <button id="probe">Probe Page</button>
     <button id="begin">Begin Capture</button>
@@ -187,21 +39,19 @@
     <button id="copyPrompt" class="secondary">Copy Prompt</button>
   </div>
 
-  <div class="buttonStack">
+  <div class="stack">
     <button id="openWorkbench">Open Workbench</button>
     <button id="exportSession">Export Session</button>
   </div>
 
-  <div class="outputLabel">
+  <div class="label">
     <span>Session Summary</span>
     <span id="note">Ready</span>
   </div>
 
   <textarea id="promptBox" spellcheck="false">Session summary appears here.</textarea>
 
-  <div class="hint">
-    HAAI keeps technical evidence available underneath, but this panel shows the human-readable capture state first.
-  </div>
+  <div class="hint">Technical evidence stays available in Workbench. This panel shows the human-readable capture state first.</div>
 
   <script src="popup.js"></script>
 </body>
