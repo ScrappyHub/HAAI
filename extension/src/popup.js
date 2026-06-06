@@ -1,5 +1,7 @@
 "use strict";
 
+function bootPopup() {
+
 function el(id) {
   const node = document.getElementById(id);
   if (!node) { throw new Error("POPUP_MISSING_ELEMENT: " + id); }
@@ -224,3 +226,11 @@ exportSessionButton.addEventListener("click", async () => {
 });
 
 refreshState(false);
+
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootPopup);
+} else {
+  bootPopup();
+}
