@@ -2,6 +2,7 @@
 
 const openRuntime = document.getElementById("openRuntime");
 const openReplayReport = document.getElementById("openReplayReport");
+const openPacketBundle = document.getElementById("openPacketBundle");
 const systemCheck = document.getElementById("systemCheck");
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
@@ -200,14 +201,18 @@ openReplayReport.addEventListener("click", () => {
 });
 
 fileInput.addEventListener("change", async (event) => {
-  const file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+  const files = Array.from(event.target.files || []);
 
-  if (!file) {
+  if (files.length === 0) {
     return;
   }
 
   try {
-    await loadArtifactFile(file);
+    if (files.length > 1 || fileByName(files, "manifest.json")) {
+      await loadPacketBundleFiles(files);
+    } else {
+      await loadArtifactFile(files[0]);
+    }
   } catch (err) {
     summary.textContent = "Artifact load failed.\n\n" + String(err && err.message ? err.message : err);
   }
@@ -230,18 +235,210 @@ dropZone.addEventListener("drop", async (event) => {
   event.preventDefault();
   dropZone.classList.remove("dragOver");
 
-  const file = event.dataTransfer.files && event.dataTransfer.files[0]
-    ? event.dataTransfer.files[0]
-    : null;
+  const files = Array.from(event.dataTransfer.files || []);
 
-  if (!file) {
+  if (files.length === 0) {
     summary.textContent = "No file dropped.";
     return;
   }
 
   try {
-    await loadArtifactFile(file);
+    if (files.length > 1 || fileByName(files, "manifest.json")) {
+      await loadPacketBundleFiles(files);
+    } else {
+      await loadArtifactFile(files[0]);
+    }
   } catch (err) {
     summary.textContent = "Artifact load failed.\n\n" + String(err && err.message ? err.message : err);
   }
+});
+
+function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+
+    reader.readAsText(file);
+  });
+}
+
+function parseSha256Sums(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const match = line.match(/^([a-fA-F0-9]{64})\s+\s*(.+)$/);
+
+      if (!match) {
+        return {
+          ok: false,
+          raw: line,
+          sha256: "",
+          name: ""
+        };
+      }
+
+      return {
+        ok: true,
+        raw: line,
+        sha256: match[1].toLowerCase(),
+        name: match[2]
+      };
+    });
+}
+
+function fileByName(files, name) {
+  return Array.from(files || []).find((file) => file.name === name) || null;
+}
+
+async function loadPacketBundleFiles(files) {
+  const fileList = Array.from(files || []);
+  const failures = [];
+
+  const manifestFile = fileByName(fileList, "manifest.json");
+  const packetIdFile = fileByName(fileList, "packet_id.txt");
+  const replayReportFile = fileByName(fileList, "replay_report.json");
+  const replayVerifyFile = fileByName(fileList, "replay_verify.json");
+  const timelineFile = fileByName(fileList, "replay_timeline.json");
+  const sumsFile = fileByName(fileList, "sha256sums.txt");
+
+  [
+    ["manifest.json", manifestFile],
+    ["packet_id.txt", packetIdFile],
+    ["replay_report.json", replayReportFile],
+    ["replay_verify.json", replayVerifyFile],
+    ["replay_timeline.json", timelineFile],
+    ["sha256sums.txt", sumsFile]
+  ].forEach((row) => {
+    if (!row[1]) {
+      failures.push("MISSING_" + row[0]);
+    }
+  });
+
+  if (failures.length > 0) {
+    const result = {
+      schema: "haai.runtime_packet_verify.v1",
+      created_utc: new Date().toISOString(),
+      ok: false,
+      failures: failures
+    };
+
+    summary.textContent = "Packet bundle verification failed.\n\n" + failures.join("\n");
+    details.textContent = JSON.stringify(result, null, 2);
+    return;
+  }
+
+  const manifestText = await readTextFile(manifestFile);
+  const packetIdText = (await readTextFile(packetIdFile)).trim();
+  const sumsText = await readTextFile(sumsFile);
+
+  let manifest = null;
+
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch (err) {
+    failures.push("MANIFEST_JSON_INVALID");
+  }
+
+  if (manifest) {
+    const canonical = window.HAAIRuntimeCore.canonicalJson(manifest);
+    const expectedPacketId = await window.HAAIRuntimeCore.sha256Hex(canonical);
+
+    if (packetIdText !== expectedPacketId) {
+      failures.push("PACKET_ID_MISMATCH");
+    }
+  }
+
+  const rows = parseSha256Sums(sumsText);
+
+  rows.forEach((row) => {
+    if (!row.ok) {
+      failures.push("BAD_SHA256SUM_LINE: " + row.raw);
+    }
+  });
+
+  for (const row of rows) {
+    if (!row.ok) { continue; }
+
+    const file = fileByName(fileList, row.name);
+
+    if (!file) {
+      failures.push("BUNDLE_FILE_MISSING: " + row.name);
+      continue;
+    }
+
+    const body = await readTextFile(file);
+    const actual = await window.HAAIRuntimeCore.sha256Hex(body);
+
+    if (actual !== row.sha256) {
+      failures.push("HASH_MISMATCH: " + row.name);
+    }
+  }
+
+  let replayReport = null;
+  let replayVerify = null;
+  let replayTimeline = null;
+
+  try {
+    replayReport = JSON.parse(await readTextFile(replayReportFile));
+  } catch (err) {
+    failures.push("REPLAY_REPORT_JSON_INVALID");
+  }
+
+  try {
+    replayVerify = JSON.parse(await readTextFile(replayVerifyFile));
+  } catch (err) {
+    failures.push("REPLAY_VERIFY_JSON_INVALID");
+  }
+
+  try {
+    replayTimeline = JSON.parse(await readTextFile(timelineFile));
+  } catch (err) {
+    failures.push("REPLAY_TIMELINE_JSON_INVALID");
+  }
+
+  if (replayVerify && replayVerify.ok !== true) {
+    failures.push("REPLAY_VERIFY_NOT_OK");
+  }
+
+  const runtime = replayReport ? runtimeFromArtifact(replayReport) : null;
+
+  if (runtime) {
+    runtime.import_verified = failures.length === 0;
+    runtime.current_packet_id = packetIdText;
+  }
+
+  lastLoadedArtifact = replayReport || manifest;
+  lastRuntimeState = runtime;
+
+  const result = {
+    schema: "haai.runtime_packet_verify.v1",
+    created_utc: new Date().toISOString(),
+    ok: failures.length === 0,
+    packet_id: packetIdText,
+    checked_files: rows.length,
+    failures: failures,
+    manifest: manifest,
+    replay_verify: replayVerify,
+    replay_timeline_count: Array.isArray(replayTimeline) ? replayTimeline.length : 0
+  };
+
+  summary.textContent =
+    "HAAI Packet Bundle\n\n" +
+    "Status: " + (result.ok ? "PASS" : "FAIL") + "\n" +
+    "PacketId: " + packetIdText + "\n" +
+    "Checked files: " + result.checked_files + "\n" +
+    "Timeline captures: " + result.replay_timeline_count + "\n\n" +
+    runtimeSummaryText(runtime);
+
+  details.textContent = JSON.stringify({
+    verification: result,
+    runtime_state: runtime
+  }, null, 2);
+}
+openPacketBundle.addEventListener("click", () => {
+  fileInput.click();
 });

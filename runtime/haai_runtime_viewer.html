@@ -82,13 +82,14 @@
     <div class="panel">
       <button id="openRuntime">Open Runtime State</button>
       <button id="openReplayReport">Open Replay Report</button>
+<button id="openPacketBundle">Open Packet Bundle</button>
       <button id="systemCheck">Runtime System Check</button>
 
       <div id="dropZone" class="dropZone">
-        Drop a HAAI runtime_state_export.json or replay_report.json here.
+        Drop HAAI runtime/replay/certification artifacts or a full packet bundle here.
       </div>
 
-      <input id="fileInput" type="file" accept=".json,.txt" style="display:none">
+      <input id="fileInput" type="file" accept=".json,.txt" multiple style="display:none">
     </div>
 
     <div class="panel">
