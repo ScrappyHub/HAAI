@@ -3,9 +3,27 @@
 function bootPopup() {
 
 function el(id) {
-  const node = document.getElementById(id);
-  if (!node) { throw new Error("POPUP_MISSING_ELEMENT: " + id); }
-  return node;
+  return document.getElementById(id);
+}
+
+function safeText(node, value) {
+  if (node) { node.textContent = String(value || ""); }
+}
+
+function safeValue(node, value) {
+  if (node) { node.value = String(value || ""); }
+}
+
+function safeClass(node, value) {
+  if (node) { node.className = value; }
+}
+
+function safeDisabled(node, value) {
+  if (node) { node.disabled = value === true; }
+}
+
+function safeClick(node, handler) {
+  if (node) { node.addEventListener("click", handler); }
 }
 
 const captureBadge = el("captureBadge");
@@ -23,8 +41,8 @@ const copyPromptButton = el("copyPrompt");
 const openWorkbenchButton = el("openWorkbench");
 const exportSessionButton = el("exportSession");
 
-function say(text){ promptBox.value = String(text || ""); }
-function setNote(text){ note.textContent = String(text || "Ready"); }
+function say(text){ safeValue(promptBox, text); }
+function setNote(text){ safeText(note, text || "Ready"); }
 
 function sendRuntimeMessage(message){
   return new Promise((resolve) => {
@@ -73,19 +91,19 @@ function renderState(state){
   const surface = state && state.surface ? state.surface : {};
   const active = Boolean(state && state.active_capture);
 
-  captureBadge.textContent = active ? "Capturing" : "Inactive";
-  captureBadge.className = active ? "badge green" : "badge red";
-  surfaceBadge.textContent = "AI surface: " + (surface.provider || "unknown");
+  safeText(captureBadge, active ? "Capturing" : "Inactive");
+  safeClass(captureBadge, active ? "badge green" : "badge red");
+  safeText(surfaceBadge, "AI surface: " + (surface.provider || "unknown"));
 
   const events = state && Array.isArray(state.events) ? state.events.length : 0;
-  metaLine.textContent =
+  safeText(metaLine,
     "domain=" + (surface.domain || "-") +
     " | messages=" + (surface.message_count || 0) +
     " | input=" + (surface.input_detected ? "yes" : "no") +
     " | events=" + events;
 
-  beginButton.disabled = active;
-  stopButton.disabled = !active;
+  safeDisabled(beginButton, active);
+  safeDisabled(stopButton, !active);
 }
 
 function humanSummary(state, timeline){
@@ -131,12 +149,12 @@ async function refreshState(showSummary){
   setNote("Ready");
 }
 
-checkButton.addEventListener("click", async () => {
+safeClick(checkButton, async () => {
   setNote("Checking...");
   await refreshState(true);
 });
 
-probeButton.addEventListener("click", async () => {
+safeClick(probeButton, async () => {
   setNote("Probing...");
   try {
     const tab = await getActiveTab();
@@ -156,7 +174,7 @@ probeButton.addEventListener("click", async () => {
   }
 });
 
-beginButton.addEventListener("click", async () => {
+safeClick(beginButton, async () => {
   setNote("Starting...");
   const response = await sendRuntimeMessage({ type:"haai_start_capture" });
   if (!response || response.ok === false) {
@@ -168,7 +186,7 @@ beginButton.addEventListener("click", async () => {
   setNote("Capture started");
 });
 
-stopButton.addEventListener("click", async () => {
+safeClick(stopButton, async () => {
   setNote("Stopping...");
   const response = await sendRuntimeMessage({ type:"haai_stop_capture" });
   if (!response || response.ok === false) {
@@ -180,7 +198,7 @@ stopButton.addEventListener("click", async () => {
   setNote("Capture stopped");
 });
 
-buildPromptButton.addEventListener("click", async () => {
+safeClick(buildPromptButton, async () => {
   setNote("Building prompt...");
   try {
     const tab = await getActiveTab();
@@ -199,7 +217,7 @@ buildPromptButton.addEventListener("click", async () => {
   }
 });
 
-copyPromptButton.addEventListener("click", async () => {
+safeClick(copyPromptButton, async () => {
   try {
     await navigator.clipboard.writeText(promptBox.value || "");
     setNote("Copied");
@@ -208,11 +226,11 @@ copyPromptButton.addEventListener("click", async () => {
   }
 });
 
-openWorkbenchButton.addEventListener("click", () => {
+safeClick(openWorkbenchButton, () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/workbench.html") });
 });
 
-exportSessionButton.addEventListener("click", async () => {
+safeClick(exportSessionButton, async () => {
   setNote("Exporting...");
   const response = await sendRuntimeMessage({ type:"haai_export_session" });
   if (!response || response.ok === false) {
