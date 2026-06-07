@@ -168,7 +168,7 @@ function renderState(state, timeline) {
 
   text("runtimeState", active ? "Capturing" : "Ready");
   text("captureRing", active ? "Capturing" : "Inactive");
-  text("surfaceBadge", "AI surface: " + (surface.domain || surface.provider || "unknown"));
+  text("surfaceBadge", "Surface: " + (surface.domain || surface.provider || "unknown"));
   text("providerBadge", "Provider: " + (surface.provider || "unknown"));
   text("domainValue", surface.domain || "-");
   text("messagesValue", surface.message_count || 0);

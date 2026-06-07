@@ -31,14 +31,14 @@
     }
 
     .shell{
-      max-width:1180px;
+      width:420px; max-width:420px;
       margin:0 auto;
-      padding:22px;
+      padding:10px;
     }
 
     .frame{
       border:1px solid var(--line);
-      border-radius:24px;
+      border-radius:18px;
       background:rgba(8,17,31,0.82);
       box-shadow:0 24px 80px rgba(0,0,0,0.32);
       overflow:hidden;
@@ -48,7 +48,7 @@
       display:flex;
       align-items:center;
       justify-content:space-between;
-      padding:24px 28px;
+      padding:16px;
       border-bottom:1px solid rgba(255,255,255,0.08);
     }
 
@@ -59,8 +59,8 @@
     }
 
     .logo{
-      width:58px;
-      height:58px;
+      width:42px;
+      height:42px;
       border:2px solid var(--blue);
       border-radius:18px;
       display:grid;
@@ -73,14 +73,14 @@
 
     h1{
       margin:0;
-      font-size:34px;
+      font-size:18px;
       letter-spacing:-0.04em;
     }
 
     .subtitle{
       color:var(--muted);
       margin-top:5px;
-      font-size:16px;
+      font-size:13px;
     }
 
     .topPills{
@@ -110,7 +110,7 @@
     }
 
     .main{
-      padding:26px;
+      padding:12px;
       display:grid;
       gap:22px;
     }
@@ -124,19 +124,19 @@
 
     .statusCard{
       display:grid;
-      grid-template-columns:220px 1fr;
+      grid-template-columns:1fr;
     }
 
     .captureRing{
       display:grid;
       place-items:center;
-      padding:28px;
-      border-right:1px solid rgba(255,255,255,0.08);
+      padding:16px;
+      border-bottom:1px solid rgba(255,255,255,0.08);
     }
 
     .ring{
-      width:150px;
-      height:150px;
+      width:116px;
+      height:116px;
       border-radius:999px;
       border:8px solid rgba(34,197,94,0.22);
       border-top-color:var(--green);
@@ -144,12 +144,12 @@
       display:grid;
       place-items:center;
       color:var(--green);
-      font-size:20px;
+      font-size:16px;
       font-weight:900;
     }
 
     .statusBody{
-      padding:26px;
+      padding:12px;
     }
 
     .badges{
@@ -176,7 +176,7 @@
 
     .metrics{
       display:grid;
-      grid-template-columns:repeat(4,1fr);
+      grid-template-columns:repeat(2,1fr);
       gap:18px;
     }
 
@@ -189,7 +189,7 @@
 
     .icon{
       color:var(--blue);
-      font-size:28px;
+      font-size:18px;
       line-height:1;
     }
 
@@ -197,7 +197,7 @@
       display:block;
       color:var(--text);
       margin-top:6px;
-      font-size:18px;
+      font-size:15px;
     }
 
     .statusFoot{
@@ -207,7 +207,7 @@
       display:flex;
       justify-content:space-between;
       color:var(--muted);
-      font-size:17px;
+      font-size:14px;
     }
 
     .section{
@@ -216,12 +216,12 @@
 
     .section h2{
       margin:0 0 18px;
-      font-size:20px;
+      font-size:16px;
     }
 
     .actions{
       display:grid;
-      grid-template-columns:repeat(3,1fr);
+      grid-template-columns:1fr;
       gap:16px;
     }
 
@@ -229,12 +229,12 @@
       text-align:left;
       border:1px solid var(--line);
       border-radius:16px;
-      padding:18px;
+      padding:13px;
       color:var(--text);
       background:rgba(56,189,248,0.08);
       cursor:pointer;
       transition:transform .12s ease, filter .12s ease;
-      min-height:94px;
+      min-height:70px;
     }
 
     button.action:hover{
@@ -243,7 +243,7 @@
     }
 
     .action .name{
-      font-size:17px;
+      font-size:14px;
       font-weight:900;
       margin-bottom:8px;
     }
@@ -260,7 +260,7 @@
 
     .summaryGrid{
       display:grid;
-      grid-template-columns:repeat(3,1fr);
+      grid-template-columns:1fr;
       gap:18px;
     }
 
@@ -277,7 +277,7 @@
       display:block;
       color:var(--text);
       margin-top:6px;
-      font-size:18px;
+      font-size:15px;
     }
 
     .timeline{
@@ -300,9 +300,9 @@
 
     .footer{
       display:grid;
-      grid-template-columns:repeat(3,1fr);
+      grid-template-columns:1fr;
       gap:16px;
-      padding:20px 26px;
+      padding:12px;
       border-top:1px solid rgba(255,255,255,0.08);
       color:var(--muted);
     }
@@ -364,10 +364,10 @@
             </div>
 
             <div class="metrics">
-              <div class="metric"><div class="icon">â—Ž</div><div>Domain<b id="domainValue">-</b></div></div>
-              <div class="metric"><div class="icon">â–£</div><div>Messages<b id="messagesValue">0</b></div></div>
-              <div class="metric"><div class="icon">âŒ¨</div><div>Input Detected<b id="inputValue">No</b></div></div>
-              <div class="metric"><div class="icon">âŒ</div><div>Events<b id="eventsValue">0</b></div></div>
+              <div class="metric"><div class="icon">D</div><div>Domain<b id="domainValue">-</b></div></div>
+              <div class="metric"><div class="icon">M</div><div>Messages<b id="messagesValue">0</b></div></div>
+              <div class="metric"><div class="icon">I</div><div>Input Detected<b id="inputValue">No</b></div></div>
+              <div class="metric"><div class="icon">E</div><div>Events<b id="eventsValue">0</b></div></div>
             </div>
 
             <div class="statusFoot">
@@ -395,12 +395,12 @@
         <div class="section">
           <h2>Session Summary <span id="note" style="float:right;color:var(--green);font-size:14px">Ready</span></h2>
           <div class="summaryGrid">
-            <div class="summaryItem"><div class="icon">â—‰</div><div>Capture State<b id="summaryCapture">Stopped</b></div></div>
-            <div class="summaryItem"><div class="icon">â–£</div><div>Visible Messages<b id="summaryMessages">0</b></div></div>
-            <div class="summaryItem"><div class="icon">âŒ</div><div>Recorded Events<b id="summaryEvents">0</b></div></div>
-            <div class="summaryItem"><div class="icon">â—Ž</div><div>Domain Changes<b id="summaryDomainChanges">0</b></div></div>
-            <div class="summaryItem"><div class="icon">âŽ‡</div><div>Conversation Changes<b id="summaryConversationChanges">0</b></div></div>
-            <div class="summaryItem"><div class="icon">â‡©</div><div>Exports<b id="summaryExports">0</b></div></div>
+            <div class="summaryItem"><div class="icon">C</div><div>Capture State<b id="summaryCapture">Stopped</b></div></div>
+            <div class="summaryItem"><div class="icon">M</div><div>Visible Messages<b id="summaryMessages">0</b></div></div>
+            <div class="summaryItem"><div class="icon">E</div><div>Recorded Events<b id="summaryEvents">0</b></div></div>
+            <div class="summaryItem"><div class="icon">D</div><div>Domain Changes<b id="summaryDomainChanges">0</b></div></div>
+            <div class="summaryItem"><div class="icon">V</div><div>Conversation Changes<b id="summaryConversationChanges">0</b></div></div>
+            <div class="summaryItem"><div class="icon">X</div><div>Exports<b id="summaryExports">0</b></div></div>
           </div>
           <br>
           <pre id="promptBox">Session summary appears here.</pre>
@@ -415,9 +415,9 @@
       </div>
 
       <div class="footer">
-        <div class="footItem"><div class="icon">â—«</div><div><b>Storage</b>Local-first</div></div>
-        <div class="footItem"><div class="icon">â—‡</div><div><b>Privacy First</b>All data stays on your device</div></div>
-        <div class="footItem"><div class="icon">âœ“</div><div><b>Evidence</b>Workbench handles technical proof</div></div>
+        <div class="footItem"><div class="icon">S</div><div><b>Storage</b>Local-first</div></div>
+        <div class="footItem"><div class="icon">P</div><div><b>Privacy First</b>All data stays on your device</div></div>
+        <div class="footItem"><div class="icon">V</div><div><b>Evidence</b>Workbench handles technical proof</div></div>
       </div>
     </div>
   </div>
