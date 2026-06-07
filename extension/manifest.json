@@ -1,35 +1,35 @@
 {
-  "manifest_version": 3,
-  "name": "HAAI Recorder",
-  "version": "0.1.0",
-  "description": "Local-first AI interaction evidence recorder adapter.",
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
-    "clipboardWrite",
-    "downloads",
-    "tabs"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
-  "background": {
-    "service_worker": "src/background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "src/content_script.js"
-      ],
-      "run_at": "document_idle"
-    }
-  ],
-  "action": {
-    "default_popup": "src/popup.html",
-    "default_title": "HAAI Recorder"
-  }
+    "manifest_version":  3,
+    "name":  "HAAI Recorder",
+    "version":  "0.1.0",
+    "description":  "Local-first AI interaction evidence recorder adapter.",
+    "permissions":  [
+                        "activeTab",
+                        "scripting",
+                        "storage",
+                        "clipboardWrite",
+                        "downloads",
+                        "tabs"
+                    ],
+    "host_permissions":  [
+                             "\u003call_urls\u003e"
+                         ],
+    "background":  {
+                       "service_worker":  "src/background.js"
+                   },
+    "content_scripts":  [
+                            {
+                                "matches":  [
+                                                "\u003call_urls\u003e"
+                                            ],
+                                "js":  [
+                                           "src/content_script.js"
+                                       ],
+                                "run_at":  "document_idle"
+                            }
+                        ],
+    "action":  {
+                   "default_popup":  "src/runtime_dashboard.html",
+                   "default_title":  "HAAI Recorder"
+               }
 }

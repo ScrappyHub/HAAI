@@ -1,0 +1,426 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HAAI Runtime Dashboard</title>
+  <style>
+    :root{
+      --bg:#06101f;
+      --panel:#0d1a2f;
+      --panel2:#101f38;
+      --line:#243a5c;
+      --text:#f7fbff;
+      --muted:#9fb2ce;
+      --blue:#38bdf8;
+      --green:#22c55e;
+      --purple:#a78bfa;
+      --amber:#f59e0b;
+      --red:#ef4444;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(56,189,248,0.18), transparent 30%),
+        radial-gradient(circle at 90% 10%, rgba(167,139,250,0.14), transparent 30%),
+        var(--bg);
+      color:var(--text);
+      font-family:Inter,Segoe UI,Arial,sans-serif;
+    }
+
+    .shell{
+      max-width:1180px;
+      margin:0 auto;
+      padding:22px;
+    }
+
+    .frame{
+      border:1px solid var(--line);
+      border-radius:24px;
+      background:rgba(8,17,31,0.82);
+      box-shadow:0 24px 80px rgba(0,0,0,0.32);
+      overflow:hidden;
+    }
+
+    .header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:24px 28px;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:16px;
+    }
+
+    .logo{
+      width:58px;
+      height:58px;
+      border:2px solid var(--blue);
+      border-radius:18px;
+      display:grid;
+      place-items:center;
+      color:var(--blue);
+      font-weight:900;
+      font-size:26px;
+      box-shadow:0 0 30px rgba(56,189,248,0.22);
+    }
+
+    h1{
+      margin:0;
+      font-size:34px;
+      letter-spacing:-0.04em;
+    }
+
+    .subtitle{
+      color:var(--muted);
+      margin-top:5px;
+      font-size:16px;
+    }
+
+    .topPills{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+
+    .pill{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 14px;
+      background:rgba(255,255,255,0.04);
+      color:#dbeafe;
+      font-weight:700;
+    }
+
+    .dot{
+      width:11px;
+      height:11px;
+      border-radius:999px;
+      background:var(--green);
+      box-shadow:0 0 14px rgba(34,197,94,0.8);
+    }
+
+    .main{
+      padding:26px;
+      display:grid;
+      gap:22px;
+    }
+
+    .statusCard,.section{
+      border:1px solid var(--line);
+      border-radius:20px;
+      background:linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025));
+      overflow:hidden;
+    }
+
+    .statusCard{
+      display:grid;
+      grid-template-columns:220px 1fr;
+    }
+
+    .captureRing{
+      display:grid;
+      place-items:center;
+      padding:28px;
+      border-right:1px solid rgba(255,255,255,0.08);
+    }
+
+    .ring{
+      width:150px;
+      height:150px;
+      border-radius:999px;
+      border:8px solid rgba(34,197,94,0.22);
+      border-top-color:var(--green);
+      border-right-color:var(--green);
+      display:grid;
+      place-items:center;
+      color:var(--green);
+      font-size:20px;
+      font-weight:900;
+    }
+
+    .statusBody{
+      padding:26px;
+    }
+
+    .badges{
+      display:flex;
+      flex-wrap:wrap;
+      gap:14px;
+      margin-bottom:24px;
+    }
+
+    .badge{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:11px 16px;
+      background:rgba(37,99,235,0.18);
+      color:#dbeafe;
+      font-weight:800;
+    }
+
+    .badge.green{
+      background:rgba(34,197,94,0.15);
+      color:#bbf7d0;
+      border-color:rgba(34,197,94,0.35);
+    }
+
+    .metrics{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:18px;
+    }
+
+    .metric{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      color:var(--muted);
+    }
+
+    .icon{
+      color:var(--blue);
+      font-size:28px;
+      line-height:1;
+    }
+
+    .metric b{
+      display:block;
+      color:var(--text);
+      margin-top:6px;
+      font-size:18px;
+    }
+
+    .statusFoot{
+      margin-top:24px;
+      padding-top:18px;
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;
+      justify-content:space-between;
+      color:var(--muted);
+      font-size:17px;
+    }
+
+    .section{
+      padding:24px;
+    }
+
+    .section h2{
+      margin:0 0 18px;
+      font-size:20px;
+    }
+
+    .actions{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:16px;
+    }
+
+    button.action{
+      text-align:left;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:18px;
+      color:var(--text);
+      background:rgba(56,189,248,0.08);
+      cursor:pointer;
+      transition:transform .12s ease, filter .12s ease;
+      min-height:94px;
+    }
+
+    button.action:hover{
+      transform:translateY(-2px);
+      filter:brightness(1.08);
+    }
+
+    .action .name{
+      font-size:17px;
+      font-weight:900;
+      margin-bottom:8px;
+    }
+
+    .action .desc{
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .action.purple{background:rgba(167,139,250,0.11)}
+    .action.green{background:rgba(34,197,94,0.11)}
+    .action.amber{background:rgba(245,158,11,0.10)}
+    .action.teal{background:rgba(20,184,166,0.10)}
+
+    .summaryGrid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:18px;
+    }
+
+    .summaryItem{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+      padding-bottom:12px;
+      color:var(--muted);
+    }
+
+    .summaryItem b{
+      display:block;
+      color:var(--text);
+      margin-top:6px;
+      font-size:18px;
+    }
+
+    .timeline{
+      display:grid;
+      gap:10px;
+    }
+
+    .eventRow{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:13px;
+      padding:12px 14px;
+      background:rgba(255,255,255,0.035);
+      color:var(--muted);
+    }
+
+    .eventRow b{color:var(--text)}
+
+    .footer{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:16px;
+      padding:20px 26px;
+      border-top:1px solid rgba(255,255,255,0.08);
+      color:var(--muted);
+    }
+
+    .footItem{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+
+    .footItem b{
+      color:var(--text);
+      display:block;
+    }
+
+    pre{
+      white-space:pre-wrap;
+      word-break:break-word;
+      margin:0;
+      color:#dbeafe;
+      line-height:1.5;
+    }
+
+    @media(max-width:900px){
+      .statusCard{grid-template-columns:1fr}
+      .captureRing{border-right:0;border-bottom:1px solid rgba(255,255,255,0.08)}
+      .actions,.metrics,.summaryGrid,.footer{grid-template-columns:1fr}
+      .header{display:block}
+      .topPills{margin-top:18px}
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="frame">
+      <div class="header">
+        <div class="brand">
+          <div class="logo">H</div>
+          <div>
+            <h1>HAAI Recorder</h1>
+            <div class="subtitle">Local-first AI evidence recorder and replay capture adapter.</div>
+          </div>
+        </div>
+        <div class="topPills">
+          <div class="pill"><span class="dot"></span><span id="runtimeState">Ready</span></div>
+          <div class="pill">v0.1</div>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="statusCard">
+          <div class="captureRing">
+            <div id="captureRing" class="ring">Inactive</div>
+          </div>
+          <div class="statusBody">
+            <div class="badges">
+              <div id="surfaceBadge" class="badge">AI surface: unknown</div>
+              <div id="providerBadge" class="badge green">Provider: unknown</div>
+            </div>
+
+            <div class="metrics">
+              <div class="metric"><div class="icon">◎</div><div>Domain<b id="domainValue">-</b></div></div>
+              <div class="metric"><div class="icon">▣</div><div>Messages<b id="messagesValue">0</b></div></div>
+              <div class="metric"><div class="icon">⌨</div><div>Input Detected<b id="inputValue">No</b></div></div>
+              <div class="metric"><div class="icon">⌁</div><div>Events<b id="eventsValue">0</b></div></div>
+            </div>
+
+            <div class="statusFoot">
+              <div><span class="dot"></span> <span id="captureLine">Capture stopped</span></div>
+              <div>Session ID: <span id="sessionId">-</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Quick Actions</h2>
+          <div class="actions">
+            <button id="check" class="action"><div class="name">Inspect Surface</div><div class="desc">Refresh current AI state</div></button>
+            <button id="probe" class="action purple"><div class="name">Probe Page</div><div class="desc">Detect provider and visible messages</div></button>
+            <button id="begin" class="action green"><div class="name">Begin Capture</div><div class="desc">Start recording replay evidence</div></button>
+            <button id="stop" class="action green"><div class="name">Stop Capture</div><div class="desc">End current capture safely</div></button>
+            <button id="buildPrompt" class="action amber"><div class="name">Build Context Prompt</div><div class="desc">Generate reusable context</div></button>
+            <button id="copyPrompt" class="action teal"><div class="name">Copy Prompt</div><div class="desc">Copy summary to clipboard</div></button>
+            <button id="openWorkbench" class="action"><div class="name">Open Runtime</div><div class="desc">Replay, verify, certify, export</div></button>
+            <button id="exportSession" class="action purple"><div class="name">Export Evidence</div><div class="desc">Export session evidence bundle</div></button>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Session Summary <span id="note" style="float:right;color:var(--green);font-size:14px">Ready</span></h2>
+          <div class="summaryGrid">
+            <div class="summaryItem"><div class="icon">◉</div><div>Capture State<b id="summaryCapture">Stopped</b></div></div>
+            <div class="summaryItem"><div class="icon">▣</div><div>Visible Messages<b id="summaryMessages">0</b></div></div>
+            <div class="summaryItem"><div class="icon">⌁</div><div>Recorded Events<b id="summaryEvents">0</b></div></div>
+            <div class="summaryItem"><div class="icon">◎</div><div>Domain Changes<b id="summaryDomainChanges">0</b></div></div>
+            <div class="summaryItem"><div class="icon">⎇</div><div>Conversation Changes<b id="summaryConversationChanges">0</b></div></div>
+            <div class="summaryItem"><div class="icon">⇩</div><div>Exports<b id="summaryExports">0</b></div></div>
+          </div>
+          <br>
+          <pre id="promptBox">Session summary appears here.</pre>
+        </div>
+
+        <div class="section">
+          <h2>Runtime Timeline</h2>
+          <div id="timeline" class="timeline">
+            <div class="eventRow"><b>No events loaded yet</b><span>Click Inspect Surface</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="footItem"><div class="icon">◫</div><div><b>Storage</b>Local-first</div></div>
+        <div class="footItem"><div class="icon">◇</div><div><b>Privacy First</b>All data stays on your device</div></div>
+        <div class="footItem"><div class="icon">✓</div><div><b>Evidence</b>Workbench handles technical proof</div></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="runtime_dashboard.js"></script>
+</body>
+</html>
