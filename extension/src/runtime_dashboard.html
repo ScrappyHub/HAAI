@@ -364,10 +364,10 @@
             </div>
 
             <div class="metrics">
-              <div class="metric"><div class="icon">◎</div><div>Domain<b id="domainValue">-</b></div></div>
-              <div class="metric"><div class="icon">▣</div><div>Messages<b id="messagesValue">0</b></div></div>
-              <div class="metric"><div class="icon">⌨</div><div>Input Detected<b id="inputValue">No</b></div></div>
-              <div class="metric"><div class="icon">⌁</div><div>Events<b id="eventsValue">0</b></div></div>
+              <div class="metric"><div class="icon">â—Ž</div><div>Domain<b id="domainValue">-</b></div></div>
+              <div class="metric"><div class="icon">â–£</div><div>Messages<b id="messagesValue">0</b></div></div>
+              <div class="metric"><div class="icon">âŒ¨</div><div>Input Detected<b id="inputValue">No</b></div></div>
+              <div class="metric"><div class="icon">âŒ</div><div>Events<b id="eventsValue">0</b></div></div>
             </div>
 
             <div class="statusFoot">
@@ -386,7 +386,8 @@
             <button id="stop" class="action green"><div class="name">Stop Capture</div><div class="desc">End current capture safely</div></button>
             <button id="buildPrompt" class="action amber"><div class="name">Build Context Prompt</div><div class="desc">Generate reusable context</div></button>
             <button id="copyPrompt" class="action teal"><div class="name">Copy Prompt</div><div class="desc">Copy summary to clipboard</div></button>
-            <button id="openWorkbench" class="action"><div class="name">Open Runtime</div><div class="desc">Replay, verify, certify, export</div></button>
+            <button id="openWorkbench" class="action"><div class="name">Open Runtime Viewer</div><div class="desc">Offline packet and replay viewer</div></button>
+            <button id="openLegacyWorkbench" class="action teal"><div class="name">Open Evidence Workbench</div><div class="desc">Replay, verify, certify, export</div></button>
             <button id="exportSession" class="action purple"><div class="name">Export Evidence</div><div class="desc">Export session evidence bundle</div></button>
           </div>
         </div>
@@ -394,12 +395,12 @@
         <div class="section">
           <h2>Session Summary <span id="note" style="float:right;color:var(--green);font-size:14px">Ready</span></h2>
           <div class="summaryGrid">
-            <div class="summaryItem"><div class="icon">◉</div><div>Capture State<b id="summaryCapture">Stopped</b></div></div>
-            <div class="summaryItem"><div class="icon">▣</div><div>Visible Messages<b id="summaryMessages">0</b></div></div>
-            <div class="summaryItem"><div class="icon">⌁</div><div>Recorded Events<b id="summaryEvents">0</b></div></div>
-            <div class="summaryItem"><div class="icon">◎</div><div>Domain Changes<b id="summaryDomainChanges">0</b></div></div>
-            <div class="summaryItem"><div class="icon">⎇</div><div>Conversation Changes<b id="summaryConversationChanges">0</b></div></div>
-            <div class="summaryItem"><div class="icon">⇩</div><div>Exports<b id="summaryExports">0</b></div></div>
+            <div class="summaryItem"><div class="icon">â—‰</div><div>Capture State<b id="summaryCapture">Stopped</b></div></div>
+            <div class="summaryItem"><div class="icon">â–£</div><div>Visible Messages<b id="summaryMessages">0</b></div></div>
+            <div class="summaryItem"><div class="icon">âŒ</div><div>Recorded Events<b id="summaryEvents">0</b></div></div>
+            <div class="summaryItem"><div class="icon">â—Ž</div><div>Domain Changes<b id="summaryDomainChanges">0</b></div></div>
+            <div class="summaryItem"><div class="icon">âŽ‡</div><div>Conversation Changes<b id="summaryConversationChanges">0</b></div></div>
+            <div class="summaryItem"><div class="icon">â‡©</div><div>Exports<b id="summaryExports">0</b></div></div>
           </div>
           <br>
           <pre id="promptBox">Session summary appears here.</pre>
@@ -414,9 +415,9 @@
       </div>
 
       <div class="footer">
-        <div class="footItem"><div class="icon">◫</div><div><b>Storage</b>Local-first</div></div>
-        <div class="footItem"><div class="icon">◇</div><div><b>Privacy First</b>All data stays on your device</div></div>
-        <div class="footItem"><div class="icon">✓</div><div><b>Evidence</b>Workbench handles technical proof</div></div>
+        <div class="footItem"><div class="icon">â—«</div><div><b>Storage</b>Local-first</div></div>
+        <div class="footItem"><div class="icon">â—‡</div><div><b>Privacy First</b>All data stays on your device</div></div>
+        <div class="footItem"><div class="icon">âœ“</div><div><b>Evidence</b>Workbench handles technical proof</div></div>
       </div>
     </div>
   </div>

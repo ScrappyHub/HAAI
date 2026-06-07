@@ -27,6 +27,7 @@ const ids = {
   buildPrompt: "buildPrompt",
   copyPrompt: "copyPrompt",
   openWorkbench: "openWorkbench",
+  openLegacyWorkbench: "openLegacyWorkbench",
   exportSession: "exportSession"
 };
 
@@ -304,6 +305,10 @@ click("copyPrompt", async () => {
 });
 
 click("openWorkbench", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("../runtime/haai_runtime_viewer.html") });
+});
+
+click("openLegacyWorkbench", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/workbench.html") });
 });
 
