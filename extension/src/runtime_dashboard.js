@@ -168,8 +168,10 @@ function renderState(state, timeline) {
 
   text("runtimeState", active ? "Capturing" : "Ready");
   text("captureRing", active ? "Capturing" : "Inactive");
+  const ring = node("captureRing");
+  if (ring) { ring.className = active ? "state" : "state off"; }
   text("surfaceBadge", "Surface: " + (surface.domain || surface.provider || "unknown"));
-  text("providerBadge", "Provider: " + (surface.provider || "unknown"));
+  text("providerValue", surface.provider || "unknown");
   text("domainValue", surface.domain || "-");
   text("messagesValue", surface.message_count || 0);
   text("inputValue", surface.input_detected ? "Yes" : "No");
