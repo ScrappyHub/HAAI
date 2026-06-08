@@ -248,6 +248,23 @@ click("probe", async () => {
 click("begin", async () => {
   text("note", "Starting");
 
+    const current = await sendRuntimeMessage({ type: "haai_get_state" });
+  const currentState = current && current.state ? current.state : current;
+  const surface = currentState && currentState.surface ? currentState.surface : {};
+  const provider = String(surface.provider || "unknown").toLowerCase();
+
+  if (provider === "unknown") {
+    setPrompt(
+      "Capture was not started.\n\n" +
+      "The current page is not recognized as an AI surface.\n\n" +
+      "Detected domain: " + (surface.domain || "-") + "\n\n" +
+      "Open ChatGPT, Grok, Claude, or another supported AI page, then click Inspect or Probe."
+    );
+    text("note", "Not an AI surface");
+    await refreshState();
+    return;
+  }
+
   const response = await sendRuntimeMessage({ type: "haai_start_capture" });
 
   if (!response || response.ok === false) {
@@ -307,7 +324,7 @@ click("copyPrompt", async () => {
 });
 
 click("openWorkbench", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("../runtime/haai_runtime_viewer.html") });
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/haai_runtime_viewer.html") });
 });
 
 click("openLegacyWorkbench", () => {
