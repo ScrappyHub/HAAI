@@ -385,6 +385,20 @@ async function verifyCurrentReplay(state) {
   };
 }
 
+
+function setTechnicalVisible(visible) {
+  technicalVisible = visible === true;
+
+  if (details) {
+    details.style.display = technicalVisible ? "block" : "none";
+  }
+
+  if (toggleTechnical) {
+    toggleTechnical.textContent = technicalVisible
+      ? "Hide Technical Evidence"
+      : "View Technical Evidence";
+  }
+}
 function humanReplaySummary(state) {
 
   if (!state) {
