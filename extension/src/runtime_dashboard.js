@@ -166,12 +166,17 @@ function renderState(state, timeline) {
   const events = Array.isArray(state.events) ? state.events.length : 0;
   const active = Boolean(state.active_capture);
 
-  text("runtimeState", active ? "Capturing" : "Ready");
-  text("captureRing", active ? "Capturing" : "Inactive");
+  const provider = String(surface.provider || "unknown").toLowerCase();
+  const supported = provider !== "unknown";
+
+  text("runtimeState", active ? "Recording" : (supported ? "Ready" : "Unsupported page"));
+  text("captureRing", active ? "Recording" : (supported ? "Ready to capture" : "Not recording"));
   const ring = node("captureRing");
   if (ring) { ring.className = active ? "state" : "state off"; }
-  text("surfaceBadge", "Surface: " + (surface.domain || surface.provider || "unknown"));
-  text("providerValue", surface.provider || "unknown");
+  text("surfaceBadge", supported
+    ? "Supported AI surface: " + (surface.domain || surface.provider || "unknown")
+    : "Unsupported page: " + (surface.domain || "unknown") + " — open ChatGPT, Claude, or Grok");
+  text("providerValue", supported ? surface.provider : "Not AI");
   text("domainValue", surface.domain || "-");
   text("messagesValue", surface.message_count || 0);
   text("inputValue", surface.input_detected ? "Yes" : "No");
@@ -179,7 +184,7 @@ function renderState(state, timeline) {
   text("captureLine", active ? "Capture running" : "Capture stopped");
   text("sessionId", state.session_id || "-");
 
-  text("summaryCapture", active ? "Running" : "Stopped");
+  text("summaryCapture", active ? "Recording" : (supported ? "Stopped" : "Unsupported"));
   text("summaryMessages", surface.message_count || 0);
   text("summaryEvents", events);
   text("summaryDomainChanges", lifecycle.domain_changes || 0);
@@ -205,7 +210,7 @@ async function refreshState() {
   const timeline = response.timeline || [];
 
   renderState(state, timeline);
-  text("note", "Ready");
+  text("note", active ? "Recording" : (supported ? "Ready" : "Open AI page"));
 
   return state;
 }
@@ -238,7 +243,7 @@ click("probe", async () => {
     );
 
     await refreshState();
-    text("note", "Ready");
+    text("note", active ? "Recording" : (supported ? "Ready" : "Open AI page"));
   } catch (err) {
     setPrompt("Probe failed.\n\n" + String(err && err.message ? err.message : err));
     text("note", "Probe failed");
