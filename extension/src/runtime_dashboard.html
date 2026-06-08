@@ -5,102 +5,96 @@
   <title>HAAI Recorder</title>
   <style>
     :root{
-      --bg:#07111f;--panel:#0e1b30;--panel2:#13233c;--line:#29405f;
-      --text:#f8fbff;--muted:#9fb4d0;--blue:#38bdf8;--green:#22c55e;
-      --amber:#f59e0b;--red:#ef4444;
+      --bg:#07111f;--panel:#0d1a2e;--panel2:#13233b;--line:#2a4264;
+      --text:#f8fbff;--muted:#a8bad3;--blue:#38bdf8;--green:#22c55e;
+      --red:#ef4444;--amber:#f59e0b;
     }
     *{box-sizing:border-box}
-    body{width:420px;margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
-    .shell{border:1px solid var(--line);border-radius:18px;background:#081425;overflow:hidden}
-    .head{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid rgba(255,255,255,.08)}
-    .logo{width:42px;height:42px;border:2px solid var(--blue);border-radius:13px;display:grid;place-items:center;color:var(--blue);font-weight:900}
-    h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:2px}
-    .status{padding:14px;background:linear-gradient(180deg,rgba(56,189,248,.08),rgba(255,255,255,.02));border-bottom:1px solid rgba(255,255,255,.08)}
-    .topline{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .state{font-size:24px;font-weight:900;color:var(--green)}
-    .state.off{color:var(--muted)}
-    .pill{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.04);font-weight:800;font-size:12px}
-    .surface{font-size:13px;color:#cfe3ff;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    .metric{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px}
-    .metric span{display:block;color:var(--muted);font-size:11px}.metric b{display:block;font-size:16px;margin-top:4px}
-    .actions{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-bottom:1px solid rgba(255,255,255,.08)}
+    body{width:400px;margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
+    .shell{padding:12px}
+    .card{border:1px solid var(--line);border-radius:18px;background:#081425;overflow:hidden}
+    .head{display:flex;gap:12px;align-items:center;padding:14px}
+    .logo{width:38px;height:38px;border:2px solid var(--blue);border-radius:12px;display:grid;place-items:center;color:var(--blue);font-weight:900}
+    h1{font-size:21px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .status{padding:15px;border-top:1px solid rgba(255,255,255,.07);background:#0d1c31}
+    .stateRow{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .state{font-size:26px;font-weight:900;line-height:1.05}
+    .state.good{color:var(--green)}.state.bad{color:var(--amber)}.state.off{color:#c5d3e7}
+    .pill{font-size:12px;font-weight:900;border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.04);white-space:nowrap}
+    .surface{margin-top:10px;color:#d5e8ff;font-size:13px;line-height:1.35}
+    .next{margin-top:12px;border:1px solid rgba(56,189,248,.28);border-radius:12px;padding:10px;background:rgba(56,189,248,.08);font-size:13px;color:#dbeafe}
+    .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+    .metric{border:1px solid rgba(255,255,255,.08);border-radius:11px;background:rgba(255,255,255,.035);padding:8px}
+    .metric span{display:block;color:var(--muted);font-size:11px}.metric b{display:block;font-size:16px;margin-top:2px}
+    .actions{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid rgba(255,255,255,.07)}
     button{border:0;border-radius:12px;padding:11px;background:var(--blue);color:#03111f;font-weight:900;cursor:pointer}
-    button.dark{background:#1d2c45;color:#e8f1ff;border:1px solid var(--line)}
-    button.green{background:rgba(34,197,94,.2);color:#d8ffe6;border:1px solid rgba(34,197,94,.35)}
-    button:disabled{background:#475569;color:#cbd5e1;cursor:not-allowed}
+    button.dark{background:#1e2d46;color:#e9f2ff;border:1px solid var(--line)}
+    button.green{background:rgba(34,197,94,.20);color:#dcffe9;border:1px solid rgba(34,197,94,.38)}
+    button:disabled{opacity:.45;cursor:not-allowed}
     .wide{grid-column:1/-1}
-    .summary{padding:12px;border-bottom:1px solid rgba(255,255,255,.08)}
-    .summaryHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-    .summaryHead b{font-size:14px}.note{color:var(--green);font-size:12px;font-weight:800}
-    .summaryGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
-    .sbox{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px}
-    .sbox span{display:block;color:var(--muted);font-size:11px}.sbox b{display:block;font-size:14px;margin-top:3px}
-    pre{margin:0;max-height:105px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#050b18;border:1px solid var(--line);border-radius:12px;padding:10px;color:#dbeafe;font-size:11px;line-height:1.4}
-    .timeline{padding:12px}
-    .timeline h2{font-size:14px;margin:0 0 8px}
-    .eventRow{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}
-    .eventRow b{color:#e8f1ff;font-weight:700}
+    .live{padding:12px;border-top:1px solid rgba(255,255,255,.07)}
+    .liveTop{display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px}
+    .note{color:var(--green);font-weight:900}
+    pre{margin:0;max-height:86px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#050b18;border:1px solid var(--line);border-radius:12px;padding:10px;color:#dbeafe;font-size:11px;line-height:1.35}
+    .advanced{padding:12px;border-top:1px solid rgba(255,255,255,.07);display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .timeline{padding:0 12px 12px;color:var(--muted);font-size:11px}
+    .event{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06);padding:5px 0;gap:8px}
+    .event b{color:#e8f1ff}
   </style>
 </head>
 <body>
   <div class="shell">
-    <div class="head">
-      <div class="logo">H</div>
-      <div>
-        <h1>HAAI Recorder</h1>
-        <div class="sub">AI evidence recorder and runtime adapter</div>
+    <div class="card">
+      <div class="head">
+        <div class="logo">H</div>
+        <div>
+          <h1>HAAI Recorder</h1>
+          <div class="sub">Local AI evidence capture adapter</div>
+        </div>
       </div>
-    </div>
 
-    <div class="status">
-      <div class="topline">
-        <div id="captureRing" class="state off">Inactive</div>
-        <div id="runtimeState" class="pill">Ready</div>
+      <div class="status">
+        <div class="stateRow">
+          <div id="captureRing" class="state off">Checking</div>
+          <div id="runtimeState" class="pill">Loading</div>
+        </div>
+        <div id="surfaceBadge" class="surface">Detecting current page...</div>
+        <div id="nextStep" class="next">Waiting for HAAI state.</div>
+
+        <div class="metrics">
+          <div class="metric"><span>Provider</span><b id="providerValue">-</b></div>
+          <div class="metric"><span>Events</span><b id="eventsValue">0</b></div>
+          <div class="metric"><span>Messages</span><b id="messagesValue">0</b></div>
+        </div>
       </div>
-      <div id="surfaceBadge" class="surface">Surface: unknown</div>
-      <div class="metrics">
-        <div class="metric"><span>Provider</span><b id="providerValue">-</b></div>
-        <div class="metric"><span>Messages</span><b id="messagesValue">0</b></div>
-        <div class="metric"><span>Input</span><b id="inputValue">No</b></div>
-        <div class="metric"><span>Events</span><b id="eventsValue">0</b></div>
+
+      <div class="actions">
+        <button id="check">Inspect</button>
+        <button id="probe" class="dark">Probe</button>
+        <button id="begin" class="green">Start Recording</button>
+        <button id="stop" class="dark">Stop</button>
+        <button id="openWorkbench" class="wide">Open Runtime Viewer</button>
       </div>
-    </div>
 
-    <div class="actions">
-      <button id="check">Inspect</button>
-      <button id="probe" class="dark">Probe</button>
-      <button id="begin" class="green">Begin Capture</button>
-      <button id="stop" class="dark">Stop Capture</button>
-      <button id="openWorkbench" class="wide">Open Runtime Viewer</button>
-      <button id="openLegacyWorkbench" class="wide dark">Open Evidence Workbench</button>
-      <button id="exportSession" class="wide">Export Evidence</button>
-      <button id="buildPrompt" class="dark">Build Prompt</button>
-      <button id="copyPrompt" class="dark">Copy Prompt</button>
-    </div>
-
-    <div class="summary">
-      <div class="summaryHead"><b>Session Summary</b><span id="note" class="note">Ready</span></div>
-      <div class="summaryGrid">
-        <div class="sbox"><span>State</span><b id="summaryCapture">Stopped</b></div>
-        <div class="sbox"><span>Domain</span><b id="domainValue">-</b></div>
-        <div class="sbox"><span>Exports</span><b id="summaryExports">0</b></div>
+      <div class="live">
+        <div class="liveTop"><b>What HAAI sees</b><span id="note" class="note">Ready</span></div>
+        <pre id="promptBox">No state loaded yet.</pre>
       </div>
-      <pre id="promptBox">Session summary appears here.</pre>
-    </div>
 
-    <div class="timeline">
-      <h2>Recent Timeline</h2>
-      <div id="timeline"><div class="eventRow"><b>No events</b><span>Inspect first</span></div></div>
-    </div>
+      <div class="advanced">
+        <button id="exportSession">Export Evidence</button>
+        <button id="openLegacyWorkbench" class="dark">Evidence Workbench</button>
+        <button id="buildPrompt" class="dark">Build Prompt</button>
+        <button id="copyPrompt" class="dark">Copy</button>
+      </div>
 
-    <span id="providerBadge" style="display:none"></span>
-    <span id="sessionId" style="display:none"></span>
-    <span id="captureLine" style="display:none"></span>
-    <span id="summaryMessages" style="display:none"></span>
-    <span id="summaryEvents" style="display:none"></span>
-    <span id="summaryDomainChanges" style="display:none"></span>
-    <span id="summaryConversationChanges" style="display:none"></span>
+      <div id="timeline" class="timeline"></div>
+
+      <span id="inputValue" style="display:none"></span>
+      <span id="domainValue" style="display:none"></span>
+      <span id="summaryCapture" style="display:none"></span>
+      <span id="summaryExports" style="display:none"></span>
+    </div>
   </div>
 
   <script src="runtime_dashboard.js"></script>

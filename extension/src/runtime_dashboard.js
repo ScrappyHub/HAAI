@@ -4,22 +4,17 @@ const ids = {
   runtimeState: "runtimeState",
   captureRing: "captureRing",
   surfaceBadge: "surfaceBadge",
-  providerBadge: "providerBadge",
-  domainValue: "domainValue",
+  providerValue: "providerValue",
   messagesValue: "messagesValue",
   inputValue: "inputValue",
   eventsValue: "eventsValue",
-  captureLine: "captureLine",
-  sessionId: "sessionId",
+  domainValue: "domainValue",
   summaryCapture: "summaryCapture",
-  summaryMessages: "summaryMessages",
-  summaryEvents: "summaryEvents",
-  summaryDomainChanges: "summaryDomainChanges",
-  summaryConversationChanges: "summaryConversationChanges",
   summaryExports: "summaryExports",
   promptBox: "promptBox",
   timeline: "timeline",
   note: "note",
+  nextStep: "nextStep",
   check: "check",
   probe: "probe",
   begin: "begin",
@@ -31,6 +26,8 @@ const ids = {
   exportSession: "exportSession"
 };
 
+let lastRenderedState = null;
+
 function node(name) {
   return document.getElementById(ids[name]);
 }
@@ -38,11 +35,6 @@ function node(name) {
 function text(name, value) {
   const el = node(name);
   if (el) { el.textContent = String(value ?? ""); }
-}
-
-function html(name, value) {
-  const el = node(name);
-  if (el) { el.innerHTML = value; }
 }
 
 function click(name, handler) {
@@ -54,6 +46,12 @@ function setPrompt(value) {
   text("promptBox", value);
 }
 
+function setStateClass(active, supported) {
+  const el = node("captureRing");
+  if (!el) { return; }
+  el.className = active ? "state good" : (supported ? "state off" : "state bad");
+}
+
 function sendRuntimeMessage(message) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(message, (response) => {
@@ -61,7 +59,6 @@ function sendRuntimeMessage(message) {
         resolve({ ok: false, error: chrome.runtime.lastError.message });
         return;
       }
-
       resolve(response || { ok: false, error: "No response returned." });
     });
   });
@@ -74,14 +71,11 @@ function getActiveTab() {
         reject(new Error(chrome.runtime.lastError.message));
         return;
       }
-
       const tab = tabs && tabs[0] ? tabs[0] : null;
-
       if (!tab || !tab.id) {
         reject(new Error("No active tab found."));
         return;
       }
-
       resolve(tab);
     });
   });
@@ -105,51 +99,70 @@ function sendTabMessage(tabId, message) {
         resolve({ ok: false, error: chrome.runtime.lastError.message });
         return;
       }
-
       resolve(response || { ok: false, error: "No response returned." });
     });
   });
+}
+
+function isSupportedProvider(provider) {
+  const p = String(provider || "unknown").toLowerCase();
+  return p !== "unknown" && p !== "-";
+}
+
+function pageAdvice(state) {
+  const surface = state.surface || {};
+  const active = Boolean(state.active_capture);
+  const supported = isSupportedProvider(surface.provider);
+
+  if (active) {
+    return "Recording now. Continue the AI session, then export evidence when finished.";
+  }
+
+  if (!supported) {
+    return "Open a supported AI page, then click Inspect or Probe. Recording is disabled here.";
+  }
+
+  if ((surface.message_count || 0) < 1) {
+    return "Supported AI page detected. Start recording or interact with the AI to capture messages.";
+  }
+
+  return "Ready. Start recording to preserve this AI session as replay evidence.";
 }
 
 function summaryText(state, timeline) {
   const surface = state.surface || {};
   const lifecycle = state.lifecycle || {};
   const events = Array.isArray(state.events) ? state.events.length : 0;
-  const captures = Array.isArray(timeline) ? timeline.length : 0;
 
   return [
-    "HAAI session summary",
-    "",
-    "Capture: " + (state.active_capture ? "running" : "stopped"),
+    "Status: " + (state.active_capture ? "recording" : "not recording"),
     "Provider: " + (surface.provider || "unknown"),
     "Domain: " + (surface.domain || "-"),
-    "Title: " + (surface.title || "-"),
-    "Visible messages: " + (surface.message_count || 0),
-    "Input detected: " + (surface.input_detected ? "yes" : "no"),
-    "Recorded events: " + events,
-    "Domain changes: " + (lifecycle.domain_changes || 0),
-    "Conversation changes: " + (lifecycle.conversation_changes || 0),
+    "Messages: " + (surface.message_count || 0),
+    "Input: " + (surface.input_detected ? "detected" : "not detected"),
+    "Events: " + events,
     "Exports: " + (lifecycle.exports || 0),
+    "Saved captures: " + (Array.isArray(timeline) ? timeline.length : 0),
     "",
-    "Captured sessions: " + captures,
-    "",
-    "Technical evidence stays available in Workbench."
+    pageAdvice(state)
   ].join("\n");
 }
 
 function renderTimeline(state) {
-  const events = Array.isArray(state.events) ? state.events.slice(-6).reverse() : [];
+  const events = Array.isArray(state.events) ? state.events.slice(-4).reverse() : [];
+  const el = node("timeline");
+  if (!el) { return; }
 
   if (events.length === 0) {
-    html("timeline", '<div class="eventRow"><b>No events loaded yet</b><span>Click Inspect Surface</span></div>');
+    el.innerHTML = "";
     return;
   }
 
-  html("timeline", events.map((event) => {
-    const type = event.event_type || "event";
-    const time = event.created_utc || event.utc || "";
-    return '<div class="eventRow"><b>' + escapeHtml(type) + '</b><span>' + escapeHtml(time) + '</span></div>';
-  }).join(""));
+  el.innerHTML = events.map((event) => {
+    const type = String(event.event_type || "event");
+    const time = String(event.created_utc || event.utc || "");
+    return '<div class="event"><b>' + escapeHtml(type) + '</b><span>' + escapeHtml(time) + '</span></div>';
+  }).join("");
 }
 
 function escapeHtml(value) {
@@ -165,39 +178,39 @@ function renderState(state, timeline) {
   const lifecycle = state.lifecycle || {};
   const events = Array.isArray(state.events) ? state.events.length : 0;
   const active = Boolean(state.active_capture);
+  const supported = isSupportedProvider(surface.provider);
 
-  const provider = String(surface.provider || "unknown").toLowerCase();
-  const supported = provider !== "unknown";
+  lastRenderedState = state;
 
-  text("runtimeState", active ? "Recording" : (supported ? "Ready" : "Unsupported page"));
-  text("captureRing", active ? "Recording" : (supported ? "Ready to capture" : "Not recording"));
-  const ring = node("captureRing");
-  if (ring) { ring.className = active ? "state" : "state off"; }
+  text("captureRing", active ? "Recording" : (supported ? "Ready" : "Not recording"));
+  text("runtimeState", active ? "LIVE" : (supported ? "Ready" : "Unsupported"));
   text("surfaceBadge", supported
     ? "Supported AI surface: " + (surface.domain || surface.provider || "unknown")
-    : "Unsupported page: " + (surface.domain || "unknown") + " — open ChatGPT, Claude, or Grok");
+    : "Unsupported page: " + (surface.domain || "unknown"));
+  text("nextStep", pageAdvice(state));
   text("providerValue", supported ? surface.provider : "Not AI");
-  text("domainValue", surface.domain || "-");
   text("messagesValue", surface.message_count || 0);
   text("inputValue", surface.input_detected ? "Yes" : "No");
   text("eventsValue", events);
-  text("captureLine", active ? "Capture running" : "Capture stopped");
-  text("sessionId", state.session_id || "-");
-
+  text("domainValue", surface.domain || "-");
   text("summaryCapture", active ? "Recording" : (supported ? "Stopped" : "Unsupported"));
-  text("summaryMessages", surface.message_count || 0);
-  text("summaryEvents", events);
-  text("summaryDomainChanges", lifecycle.domain_changes || 0);
-  text("summaryConversationChanges", lifecycle.conversation_changes || 0);
   text("summaryExports", lifecycle.exports || 0);
 
+  setStateClass(active, supported);
   setPrompt(summaryText(state, timeline));
   renderTimeline(state);
+
+  const begin = node("begin");
+  if (begin) { begin.disabled = active || !supported; }
+
+  const stop = node("stop");
+  if (stop) { stop.disabled = !active; }
+
+  text("note", active ? "Recording" : (supported ? "Ready" : "Waiting"));
 }
 
 async function refreshState() {
-  text("note", "Refreshing");
-
+  text("note", "Checking");
   const response = await sendRuntimeMessage({ type: "haai_get_state" });
 
   if (!response || response.ok === false) {
@@ -210,8 +223,6 @@ async function refreshState() {
   const timeline = response.timeline || [];
 
   renderState(state, timeline);
-  text("note", active ? "Recording" : (supported ? "Ready" : "Open AI page"));
-
   return state;
 }
 
@@ -224,26 +235,10 @@ click("probe", async () => {
 
   try {
     const tab = await getActiveTab();
-
     await ensureContentScript(tab.id);
 
-    const response = await sendTabMessage(tab.id, { type: "haai_probe_page" });
-
-    if (!response || response.ok === false) {
-      await refreshState();
-      text("note", "Probe fallback");
-      return;
-    }
-
-    setPrompt(
-      "Page probe complete.\n\n" +
-      "Provider: " + (response.provider || "unknown") + "\n" +
-      "Domain: " + (response.domain || "-") + "\n" +
-      "Messages: " + (response.message_count || 0)
-    );
-
+    await sendTabMessage(tab.id, { type: "haai_probe_page" });
     await refreshState();
-    text("note", active ? "Recording" : (supported ? "Ready" : "Open AI page"));
   } catch (err) {
     setPrompt("Probe failed.\n\n" + String(err && err.message ? err.message : err));
     text("note", "Probe failed");
@@ -251,24 +246,21 @@ click("probe", async () => {
 });
 
 click("begin", async () => {
-  text("note", "Starting");
+  const state = lastRenderedState || await refreshState();
+  const surface = state && state.surface ? state.surface : {};
 
-    const current = await sendRuntimeMessage({ type: "haai_get_state" });
-  const currentState = current && current.state ? current.state : current;
-  const surface = currentState && currentState.surface ? currentState.surface : {};
-  const provider = String(surface.provider || "unknown").toLowerCase();
-
-  if (provider === "unknown") {
+  if (!isSupportedProvider(surface.provider)) {
     setPrompt(
-      "Capture was not started.\n\n" +
-      "The current page is not recognized as an AI surface.\n\n" +
-      "Detected domain: " + (surface.domain || "-") + "\n\n" +
-      "Open ChatGPT, Grok, Claude, or another supported AI page, then click Inspect or Probe."
+      "Recording was not started.\n\n" +
+      "This is not a supported AI surface.\n\n" +
+      "Current domain: " + (surface.domain || "-") + "\n\n" +
+      "Open ChatGPT, Claude, Grok, or another supported AI page."
     );
-    text("note", "Not an AI surface");
-    await refreshState();
+    text("note", "Unsupported");
     return;
   }
+
+  text("note", "Starting");
 
   const response = await sendRuntimeMessage({ type: "haai_start_capture" });
 
@@ -300,7 +292,6 @@ click("buildPrompt", async () => {
 
   try {
     const tab = await getActiveTab();
-
     await ensureContentScript(tab.id);
 
     const response = await sendTabMessage(tab.id, { type: "haai_build_context_prompt" });
@@ -347,8 +338,14 @@ click("exportSession", async () => {
     return;
   }
 
-  setPrompt("Session export ready.\n\nFile: " + (response.filename || "-") + "\nSHA-256: " + (response.sha256 || "-"));
-  text("note", "Export ready");
+  setPrompt(
+    "Evidence export created.\n\n" +
+    "File: " + (response.filename || "-") + "\n" +
+    "SHA-256: " + (response.sha256 || "-") + "\n\n" +
+    "Check your browser downloads."
+  );
+
+  text("note", "Exported");
 });
 
 refreshState();
