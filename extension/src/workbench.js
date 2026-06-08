@@ -1,5 +1,22 @@
 "use strict";
 
+var setTechnicalVisible = function(visible) {
+  try {
+    technicalVisible = visible === true;
+
+    if (typeof details !== "undefined" && details) {
+      details.style.display = technicalVisible ? "block" : "none";
+    }
+
+    if (typeof toggleTechnical !== "undefined" && toggleTechnical) {
+      toggleTechnical.textContent = technicalVisible
+        ? "Hide Technical Evidence"
+        : "View Technical Evidence";
+    }
+  } catch (_) {}
+};
+
+
 const weekCount = document.getElementById("weekCount");
 const allCount = document.getElementById("allCount");
 const currentSession = document.getElementById("currentSession");
@@ -386,19 +403,6 @@ async function verifyCurrentReplay(state) {
 }
 
 
-function setTechnicalVisible(visible) {
-  technicalVisible = visible === true;
-
-  if (details) {
-    details.style.display = technicalVisible ? "block" : "none";
-  }
-
-  if (toggleTechnical) {
-    toggleTechnical.textContent = technicalVisible
-      ? "Hide Technical Evidence"
-      : "View Technical Evidence";
-  }
-}
 function humanReplaySummary(state) {
 
   if (!state) {
