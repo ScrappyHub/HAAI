@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HAAI Replay Center</title>
+  <style>
+    :root{--bg:#07111f;--panel:#0e1b30;--line:#29405f;--text:#f8fbff;--muted:#9fb4d0;--blue:#38bdf8;--green:#22c55e}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
+    .shell{max-width:1180px;margin:0 auto;padding:24px}
+    .hero,.panel{border:1px solid var(--line);border-radius:20px;background:#0b1728;padding:22px;margin-bottom:18px}
+    h1{margin:0;font-size:34px}.sub{color:var(--muted);margin-top:6px}
+    .grid{display:grid;grid-template-columns:330px 1fr;gap:18px}
+    .statrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+    .stat{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;background:rgba(255,255,255,.035)}
+    .stat span{display:block;color:var(--muted);font-size:13px}.stat b{display:block;font-size:22px;margin-top:4px}
+    button{border:0;border-radius:12px;padding:12px 14px;background:var(--blue);color:#04111f;font-weight:900;cursor:pointer;margin:0 8px 8px 0}
+    button.dark{background:#1e2d46;color:#e9f2ff;border:1px solid var(--line)}
+    .session{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px;margin-bottom:10px;background:rgba(255,255,255,.035);cursor:pointer}
+    .session:hover{filter:brightness(1.08)}
+    .session b{display:block}.session span{display:block;color:var(--muted);font-size:13px;margin-top:4px}
+    pre{white-space:pre-wrap;word-break:break-word;margin:0;background:#050b18;border:1px solid var(--line);border-radius:14px;padding:14px;color:#dbeafe;line-height:1.45;max-height:520px;overflow:auto}
+    .timeline{display:grid;gap:8px}
+    .event{display:flex;justify-content:space-between;gap:16px;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;background:rgba(255,255,255,.03);color:var(--muted)}
+    .event b{color:var(--text)}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hero">
+      <h1>HAAI Replay Center</h1>
+      <div class="sub">Session-first replay viewer for captured AI work.</div>
+      <div class="statrow">
+        <div class="stat"><span>Current State</span><b id="stateValue">Loading</b></div>
+        <div class="stat"><span>Provider</span><b id="providerValue">-</b></div>
+        <div class="stat"><span>Events</span><b id="eventsValue">0</b></div>
+        <div class="stat"><span>Saved Sessions</span><b id="savedValue">0</b></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <button id="refresh">Refresh</button>
+      <button id="exportCurrent">Export Current Session</button>
+      <button id="openEvidenceLab" class="dark">Open Evidence Lab</button>
+      <button id="openArtifactViewer" class="dark">Open Artifact Viewer</button>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Recent Sessions</h2>
+        <div id="sessions">Loading sessions...</div>
+      </div>
+
+      <div class="panel">
+        <h2>Replay Detail</h2>
+        <pre id="detail">Select a session or refresh current state.</pre>
+        <h2>Recent Timeline</h2>
+        <div id="timeline" class="timeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="replay_center.js"></script>
+</body>
+</html>

@@ -320,7 +320,7 @@ click("copyPrompt", async () => {
 });
 
 click("openWorkbench", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("src/haai_runtime_viewer.html") });
+  chrome.tabs.create({ url: chrome.runtime.getURL("src/replay_center.html") });
 });
 
 click("openLegacyWorkbench", () => {
