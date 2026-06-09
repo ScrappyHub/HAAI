@@ -1,16 +1,17 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-let currentState = null;
+
+let currentState = {};
 let currentTimeline = [];
 let activeTabSurface = null;
 
-function set(id, value) {
+function setText(id, value) {
   const el = $(id);
   if (el) { el.textContent = String(value ?? ""); }
 }
 
-function cls(id, value) {
+function setClass(id, value) {
   const el = $(id);
   if (el) { el.className = value; }
 }
@@ -27,35 +28,29 @@ function send(message) {
   });
 }
 
-
 function providerFromUrl(url) {
   const u = String(url || "").toLowerCase();
-
   if (u.includes("chatgpt.com") || u.includes("chat.openai.com")) { return "ChatGPT"; }
   if (u.includes("claude.ai")) { return "Claude"; }
   if (u.includes("gemini.google.com")) { return "Gemini"; }
   if (u.includes("grok.com") || u.includes("x.ai")) { return "Grok"; }
   if (u.includes("perplexity.ai")) { return "Perplexity"; }
-
   return "unknown";
 }
 
 function domainFromUrl(url) {
-  try {
-    return new URL(url).hostname;
-  } catch (_) {
-    return "";
-  }
+  try { return new URL(url).hostname; } catch (_) { return ""; }
+}
+
+function supportedProvider(provider) {
+  const p = String(provider || "unknown").toLowerCase();
+  return p !== "unknown" && p !== "-";
 }
 
 function getActiveTab() {
   return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (chrome.runtime.lastError) {
-        resolve(null);
-        return;
-      }
-
+    chrome.tabs.query({ active:true, currentWindow:true }, (tabs) => {
+      if (chrome.runtime.lastError) { resolve(null); return; }
       resolve(tabs && tabs[0] ? tabs[0] : null);
     });
   });
@@ -78,56 +73,47 @@ async function loadActiveTabSurface() {
 
   return activeTabSurface;
 }
-function supportedProvider(provider) {
-  const p = String(provider || "unknown").toLowerCase();
-  return p !== "unknown" && p !== "-";
-}
-
-function niceProvider(surface) {
-  const p = String(surface.provider || "").trim();
-  if (p && supportedProvider(p)) { return p; }
-  return surface.domain || "Unsupported site";
-}
 
 function lastSavedText(timeline) {
   if (!Array.isArray(timeline) || timeline.length === 0) {
     return "No saved capture shown yet.";
   }
+
   const last = timeline[timeline.length - 1];
   return "Last saved: " + (last.stopped_utc || last.started_utc || "available");
 }
 
 function render(state, timeline) {
-  const recordedSurface = state.surface || {};
+  const recordedSurface = state && state.surface ? state.surface : {};
   const surface = activeTabSurface || recordedSurface;
-  const active = Boolean(state.active_capture);
-  const supported = supportedProvider(surface.provider);
-  const events = Array.isArray(state.events) ? state.events.length : 0;
+  const isActive = Boolean(state && state.active_capture);
+  const isSupported = supportedProvider(surface.provider);
+  const eventCount = state && Array.isArray(state.events) ? state.events.length : 0;
 
-  currentState = state;
+  currentState = state || {};
   currentTimeline = Array.isArray(timeline) ? timeline : [];
 
-  set("modePill", active ? "live" : (supported ? "ready" : "unsupported"));
-  set("status", active ? "â— Recording" : (supported ? "â—‹ Ready" : "Unsupported Site"));
-  cls("status", active ? "status live" : (supported ? "status ready" : "status bad"));
+  setText("modePill", isActive ? "live" : (isSupported ? "ready" : "unsupported"));
+  setText("status", isActive ? "Recording" : (isSupported ? "Ready" : "Unsupported Site"));
+  setClass("status", isActive ? "status live" : (isSupported ? "status ready" : "status bad"));
 
-  set("site", supported ? niceProvider(surface) : (surface.domain || "Unsupported site"));
-  set("title", supported ? (surface.title || "AI page detected") : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.");
-  set("messages", surface.message_count || 0);
-  set("events", events);
-  set("lastSaved", lastSavedText(currentTimeline));
+  setText("site", isSupported ? surface.provider : (surface.domain || "Unsupported site"));
+  setText("title", isSupported ? (surface.title || "AI page detected") : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.");
+  setText("messages", recordedSurface.message_count || 0);
+  setText("events", eventCount);
+  setText("lastSaved", lastSavedText(currentTimeline));
 
   const primary = $("primaryAction");
   if (primary) {
-    primary.disabled = !supported && !active;
-    primary.textContent = active ? "Stop Recording" : "Start Recording";
-    primary.className = active ? "stop" : "primary";
-    if (!supported && !active) { primary.className = "primary disabled"; }
+    primary.disabled = !isSupported && !isActive;
+    primary.textContent = isActive ? "Stop Recording" : "Start Recording";
+    primary.className = isActive ? "stop" : "primary";
+    if (!isSupported && !isActive) { primary.className = "primary disabled"; }
   }
 
-  set("message", active
+  setText("message", isActive
     ? "Recording now. Continue your AI session, then stop when finished."
-    : supported
+    : isSupported
       ? "Ready to record this AI session."
       : "Recording is disabled on this page."
   );
@@ -137,63 +123,74 @@ async function refresh() {
   await loadActiveTabSurface();
 
   const response = await send({ type:"haai_get_state" });
+
   if (!response || response.ok === false) {
-    set("status", "Needs Attention");
-    cls("status", "status bad");
-    set("message", "HAAI state failed: " + ((response && response.error) || "No response returned."));
+    setText("status", "Needs Attention");
+    setClass("status", "status bad");
+    setText("message", "HAAI state failed: " + ((response && response.error) || "No response returned."));
     return;
   }
+
   render(response.state || response, response.timeline || []);
 }
 
 async function toggleRecording() {
-  const state = currentState || {};
-  const recordedSurface = state.surface || {};
-  const surface = activeTabSurface || recordedSurface;
-  const active = Boolean(state.active_capture);
+  await loadActiveTabSurface();
 
-  if (!active && !supportedProvider(surface.provider)) {
-    set("message", "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page first.");
+  const surface = activeTabSurface || {};
+  const isActive = Boolean(currentState && currentState.active_capture);
+
+  if (!isActive && !supportedProvider(surface.provider)) {
+    setText("message", "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page first.");
     return;
   }
 
-  const response = await send({ type: active ? "haai_stop_capture" : "haai_start_capture" });
+  const response = await send({ type: isActive ? "haai_stop_capture" : "haai_start_capture" });
+
   if (!response || response.ok === false) {
-    set("message", "Recording action failed: " + ((response && response.error) || "No response returned."));
+    setText("message", "Recording action failed: " + ((response && response.error) || "No response returned."));
     return;
   }
 
   await refresh();
 }
 
-$("primaryAction").addEventListener("click", toggleRecording);
+function bind(id, fn) {
+  const el = $(id);
+  if (el) { el.addEventListener("click", fn); }
+}
 
-$("advancedToggle").addEventListener("click", () => {
+bind("primaryAction", toggleRecording);
+
+bind("advancedToggle", () => {
   const panel = $("advanced");
   if (panel) { panel.classList.toggle("open"); }
 });
 
-$("openReplay").addEventListener("click", () => {
+bind("openReplay", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/replay_center.html") });
 });
 
-$("openWorkbench").addEventListener("click", () => {
+bind("openWorkbench", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/workbench.html") });
 });
 
-$("exportSession").addEventListener("click", async () => {
-  set("message", "Exporting evidence...");
+bind("exportSession", async () => {
+  setText("message", "Exporting evidence...");
+
   const response = await send({ type:"haai_export_session" });
+
   if (!response || response.ok === false) {
-    set("message", "Export failed: " + ((response && response.error) || "No response returned."));
+    setText("message", "Export failed: " + ((response && response.error) || "No response returned."));
     return;
   }
-  set("message", "Exported. Check browser downloads.\n" + (response.filename || ""));
+
+  setText("message", "Exported. Check browser downloads.\n" + (response.filename || ""));
   await refresh();
 });
 
-$("buildPrompt").addEventListener("click", async () => {
-  set("message", "Recovery prompt lives in Workbench. Open Advanced â†’ Workbench for full tools.");
+bind("buildPrompt", () => {
+  setText("message", "Recovery prompt lives in Workbench. Open Advanced → Workbench for full tools.");
 });
 
 refresh();
