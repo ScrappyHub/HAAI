@@ -3,6 +3,7 @@
 const $ = (id) => document.getElementById(id);
 let currentState = null;
 let currentTimeline = [];
+let activeTabSurface = null;
 
 function set(id, value) {
   const el = $(id);
@@ -26,6 +27,57 @@ function send(message) {
   });
 }
 
+
+function providerFromUrl(url) {
+  const u = String(url || "").toLowerCase();
+
+  if (u.includes("chatgpt.com") || u.includes("chat.openai.com")) { return "ChatGPT"; }
+  if (u.includes("claude.ai")) { return "Claude"; }
+  if (u.includes("gemini.google.com")) { return "Gemini"; }
+  if (u.includes("grok.com") || u.includes("x.ai")) { return "Grok"; }
+  if (u.includes("perplexity.ai")) { return "Perplexity"; }
+
+  return "unknown";
+}
+
+function domainFromUrl(url) {
+  try {
+    return new URL(url).hostname;
+  } catch (_) {
+    return "";
+  }
+}
+
+function getActiveTab() {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+
+      resolve(tabs && tabs[0] ? tabs[0] : null);
+    });
+  });
+}
+
+async function loadActiveTabSurface() {
+  const tab = await getActiveTab();
+
+  if (!tab) {
+    activeTabSurface = null;
+    return null;
+  }
+
+  activeTabSurface = {
+    provider: providerFromUrl(tab.url || ""),
+    domain: domainFromUrl(tab.url || ""),
+    title: tab.title || "",
+    url: tab.url || ""
+  };
+
+  return activeTabSurface;
+}
 function supportedProvider(provider) {
   const p = String(provider || "unknown").toLowerCase();
   return p !== "unknown" && p !== "-";
@@ -46,7 +98,8 @@ function lastSavedText(timeline) {
 }
 
 function render(state, timeline) {
-  const surface = state.surface || {};
+  const recordedSurface = state.surface || {};
+  const surface = activeTabSurface || recordedSurface;
   const active = Boolean(state.active_capture);
   const supported = supportedProvider(surface.provider);
   const events = Array.isArray(state.events) ? state.events.length : 0;
@@ -55,7 +108,7 @@ function render(state, timeline) {
   currentTimeline = Array.isArray(timeline) ? timeline : [];
 
   set("modePill", active ? "live" : (supported ? "ready" : "unsupported"));
-  set("status", active ? "● Recording" : (supported ? "○ Ready" : "Unsupported Site"));
+  set("status", active ? "â— Recording" : (supported ? "â—‹ Ready" : "Unsupported Site"));
   cls("status", active ? "status live" : (supported ? "status ready" : "status bad"));
 
   set("site", supported ? niceProvider(surface) : (surface.domain || "Unsupported site"));
@@ -81,6 +134,8 @@ function render(state, timeline) {
 }
 
 async function refresh() {
+  await loadActiveTabSurface();
+
   const response = await send({ type:"haai_get_state" });
   if (!response || response.ok === false) {
     set("status", "Needs Attention");
@@ -93,7 +148,8 @@ async function refresh() {
 
 async function toggleRecording() {
   const state = currentState || {};
-  const surface = state.surface || {};
+  const recordedSurface = state.surface || {};
+  const surface = activeTabSurface || recordedSurface;
   const active = Boolean(state.active_capture);
 
   if (!active && !supportedProvider(surface.provider)) {
@@ -137,7 +193,7 @@ $("exportSession").addEventListener("click", async () => {
 });
 
 $("buildPrompt").addEventListener("click", async () => {
-  set("message", "Recovery prompt lives in Workbench. Open Advanced → Workbench for full tools.");
+  set("message", "Recovery prompt lives in Workbench. Open Advanced â†’ Workbench for full tools.");
 });
 
 refresh();
