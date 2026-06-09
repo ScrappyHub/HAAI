@@ -80,7 +80,18 @@ function lastSavedText(timeline) {
   }
 
   const last = timeline[timeline.length - 1];
-  return "Last saved: " + (last.stopped_utc || last.started_utc || "available");
+  const raw = last.stopped_utc || last.started_utc || "";
+
+  if (!raw) {
+    return "Last saved capture available.";
+  }
+
+  try {
+    const d = new Date(raw);
+    return "Last saved: " + d.toLocaleString();
+  } catch (_) {
+    return "Last saved: " + raw;
+  }
 }
 
 function render(state, timeline) {
@@ -98,7 +109,12 @@ function render(state, timeline) {
   setClass("status", isActive ? "status live" : (isSupported ? "status ready" : "status bad"));
 
   setText("site", isSupported ? surface.provider : (surface.domain || "Unsupported site"));
-  setText("title", isSupported ? (surface.title || "AI page detected") : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.");
+  const cleanTitle = String(surface.title || "").trim();
+  const displayTitle = cleanTitle && cleanTitle.toLowerCase() !== "haai"
+    ? cleanTitle
+    : (isSupported ? "AI page detected" : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.");
+
+  setText("title", displayTitle);
   setText("messages", recordedSurface.message_count || 0);
   setText("events", eventCount);
   setText("lastSaved", lastSavedText(currentTimeline));
@@ -190,7 +206,7 @@ bind("exportSession", async () => {
 });
 
 bind("buildPrompt", () => {
-  setText("message", "Recovery prompt lives in Workbench. Open Advanced → Workbench for full tools.");
+  setText("message", "Recovery prompt lives in Workbench. Open Advanced â†’ Workbench for full tools.");
 });
 
 refresh();
