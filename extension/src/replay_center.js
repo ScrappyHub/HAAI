@@ -131,12 +131,10 @@ async function load() {
 
 q("refresh").addEventListener("click", load);
 
-q("openEvidenceLab").addEventListener("click", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("src/workbench.html") });
+
 });
 
-q("openArtifactViewer").addEventListener("click", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("src/haai_runtime_viewer.html") });
+
 });
 
 q("exportCurrent").addEventListener("click", async () => {

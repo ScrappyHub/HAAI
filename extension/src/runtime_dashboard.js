@@ -187,8 +187,7 @@ bind("openReplay", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/replay_center.html") });
 });
 
-bind("openWorkbench", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("src/workbench.html") });
+
 });
 
 bind("exportSession", async () => {
@@ -205,8 +204,6 @@ bind("exportSession", async () => {
   await refresh();
 });
 
-bind("buildPrompt", () => {
-  setText("message", "Recovery prompt lives in Workbench. Open Advanced ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Workbench for full tools.");
-});
+
 
 refresh();
