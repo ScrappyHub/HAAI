@@ -98,7 +98,8 @@ function render(state, timeline) {
 
   setText("site", isSupported ? surface.provider : (surface.domain || "Unsupported site"));
 
-  const cleanTitle = String(surface.title || "").trim();
+  const activeTitle = activeTabSurface && activeTabSurface.title ? activeTabSurface.title : "";
+  const cleanTitle = String(surface.title || activeTitle || "").trim();
   setText("title", cleanTitle && cleanTitle.toLowerCase() !== "haai"
     ? cleanTitle
     : (isSupported ? "AI page detected" : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.")

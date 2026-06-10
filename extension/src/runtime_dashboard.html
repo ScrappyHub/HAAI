@@ -24,7 +24,8 @@
     .stop{background:rgba(239,68,68,.18);color:#fecaca;border:1px solid rgba(239,68,68,.38)}
     .disabled{opacity:.45;cursor:not-allowed}
     .last{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.35}
-    .secondaryAction{margin-top:10px;background:#17263d;color:#dbeafe;border:1px solid var(--line)}
+    .primaryActionWrap{margin-top:10px}
+    .secondaryAction{background:#17263d;color:#dbeafe;border:1px solid var(--line)}
     .advancedToggle{margin-top:14px;background:#17263d;color:#dbeafe;border:1px solid var(--line)}
     .advanced{display:none;margin-top:10px;gap:8px}
     .advanced.open{display:grid}
@@ -52,8 +53,12 @@
         <div class="stat"><span>Records</span><b id="events">0</b></div>
       </div>
 
-      <button id="primaryAction" class="primary">Start Recording</button>
-      <button id="exportSession" class="secondaryAction">Export Latest Capture</button>
+      <div class="primaryActionWrap">
+        <button id="primaryAction" class="primary">Start Recording</button>
+      </div>
+      <div class="primaryActionWrap">
+        <button id="exportSession" class="secondaryAction">Export Latest Capture</button>
+      </div>
 
       <div id="lastSaved" class="last">No saved capture shown yet.</div>
       <div id="message" class="msg">Open a supported AI page to record.</div>
