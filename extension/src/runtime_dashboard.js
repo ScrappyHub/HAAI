@@ -161,7 +161,7 @@ async function toggleRecording() {
     return;
   }
 
-  const response = await send({ type: isActive ? "haai_stop_capture" : "haai_start_capture" });
+  const response = await send({ type: isActive ? "haai_stop_capture" : "haai_begin_capture" });
 
   if (!response || response.ok === false) {
     setText("message", "Recording action failed: " + ((response && response.error) || "No response returned."));
@@ -206,7 +206,7 @@ bind("exportSession", async () => {
 });
 
 bind("buildPrompt", () => {
-  setText("message", "Recovery prompt lives in Workbench. Open Advanced â†’ Workbench for full tools.");
+  setText("message", "Recovery prompt lives in Workbench. Open Advanced Ã¢â€ â€™ Workbench for full tools.");
 });
 
 refresh();
