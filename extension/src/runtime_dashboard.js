@@ -206,7 +206,7 @@ bind("exportSession", async () => {
 });
 
 bind("buildPrompt", () => {
-  setText("message", "Recovery prompt lives in Workbench. Open Advanced Ã¢â€ â€™ Workbench for full tools.");
+  setText("message", "Recovery prompt lives in Workbench. Open Advanced ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Workbench for full tools.");
 });
 
 refresh();

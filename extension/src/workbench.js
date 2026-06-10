@@ -403,6 +403,22 @@ async function verifyCurrentReplay(state) {
 }
 
 
+
+function refreshEvidenceStatus() {
+  try {
+    const verifyOk = lastVerifyResult && lastVerifyResult.ok === true;
+    const importOk = lastImportVerifyResult && lastImportVerifyResult.ok === true;
+
+    if (evidenceStatus) {
+      const parts = [];
+      parts.push(verifyOk ? "Replay verified" : "Replay not verified");
+      if (lastImportVerifyResult) {
+        parts.push(importOk ? "Import verified" : "Import failed");
+      }
+      evidenceStatus.textContent = parts.join(" | ");
+    }
+  } catch (_) {}
+}
 function humanReplaySummary(state) {
 
   if (!state) {
