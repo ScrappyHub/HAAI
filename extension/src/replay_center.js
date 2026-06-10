@@ -1,26 +1,32 @@
 "use strict";
 
 const q = (id) => document.getElementById(id);
-
 let lastState = {};
 let lastTimeline = [];
-let lastArchive = [];
 
 function set(id, value) {
   const el = q(id);
-  if (el) { el.textContent = String(value ?? ""); }
+  if (el) el.textContent = String(value ?? "");
 }
 
 function send(message) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(message, (response) => {
       if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        resolve({ ok:false, error:chrome.runtime.lastError.message });
         return;
       }
-      resolve(response || { ok: false, error: "No response returned." });
+      resolve(response || { ok:false, error:"No response returned." });
     });
   });
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;");
 }
 
 function stateSummary(state) {
@@ -37,7 +43,7 @@ function stateSummary(state) {
     "Title: " + (surface.title || "-"),
     "Messages: " + (surface.message_count || 0),
     "Input detected: " + (surface.input_detected ? "yes" : "no"),
-    "Events: " + events.length,
+    "Records: " + events.length,
     "Domain changes: " + (lifecycle.domain_changes || 0),
     "Conversation changes: " + (lifecycle.conversation_changes || 0),
     "Exports: " + (lifecycle.exports || 0)
@@ -46,45 +52,36 @@ function stateSummary(state) {
 
 function renderTimeline(events) {
   const box = q("timeline");
-  if (!box) { return; }
+  if (!box) return;
 
   const rows = (events || []).slice(-12).reverse();
-
   if (!rows.length) {
-    box.innerHTML = '<div class="event"><b>No events</b><span>-</span></div>';
+    box.innerHTML = '<div class="event"><b>No records</b><span>-</span></div>';
     return;
   }
 
   box.innerHTML = rows.map((event) => {
     return '<div class="event"><b>' +
-      escapeHtml(event.event_type || "event") +
+      escapeHtml(event.event_type || "record") +
       '</b><span>' +
       escapeHtml(event.created_utc || event.utc || "-") +
       '</span></div>';
   }).join("");
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;");
-}
-
 function renderSessions() {
   const box = q("sessions");
-  if (!box) { return; }
+  if (!box) return;
 
   if (!lastTimeline.length) {
-    box.textContent = "No saved sessions yet. Export or stop a capture to save one.";
+    box.textContent = "No saved sessions yet. Stop or export a capture to save one.";
     return;
   }
 
   box.innerHTML = lastTimeline.slice().reverse().slice(0, 20).map((item, index) => {
     const title = escapeHtml(item.title || item.domain || "Untitled capture");
     const meta = "provider=" + escapeHtml(item.provider || "unknown") +
-      " | events=" + escapeHtml(item.event_count || 0) +
+      " | records=" + escapeHtml(item.event_count || 0) +
       " | messages=" + escapeHtml(item.message_count || 0);
     const time = escapeHtml(item.stopped_utc || item.started_utc || "-");
     return '<div class="session" data-index="' + index + '"><b>' + title + '</b><span>' + meta + '</span><span>' + time + '</span></div>';
@@ -102,7 +99,6 @@ function renderSessions() {
 function render(data) {
   lastState = data.state || {};
   lastTimeline = Array.isArray(data.timeline) ? data.timeline : [];
-  lastArchive = Array.isArray(data.archive) ? data.archive : [];
 
   const surface = lastState.surface || {};
   const events = Array.isArray(lastState.events) ? lastState.events : [];
@@ -119,7 +115,7 @@ function render(data) {
 
 async function load() {
   set("detail", "Loading HAAI replay state...");
-  const response = await send({ type: "haai_get_workbench_data" });
+  const response = await send({ type:"haai_get_workbench_data" });
 
   if (!response || !response.ok) {
     set("detail", "Replay Center failed.\n\n" + ((response && response.error) || "No state returned."));
@@ -131,28 +127,16 @@ async function load() {
 
 q("refresh").addEventListener("click", load);
 
-
-});
-
-
-});
-
 q("exportCurrent").addEventListener("click", async () => {
   set("detail", "Exporting current session...");
-  const response = await send({ type: "haai_export_session" });
+  const response = await send({ type:"haai_export_session" });
 
   if (!response || !response.ok) {
     set("detail", "Export failed.\n\n" + ((response && response.error) || "No response returned."));
     return;
   }
 
-  set("detail",
-    "Export created.\n\nFile: " +
-    (response.filename || "-") +
-    "\nSHA-256: " +
-    (response.sha256 || "-") +
-    "\n\nCheck browser downloads."
-  );
+  set("detail", "Export created.\n\nFile: " + (response.filename || "-") + "\nSHA-256: " + (response.sha256 || "-") + "\n\nCheck browser downloads.");
 });
 
 load();

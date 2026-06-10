@@ -8,12 +8,12 @@ let activeTabSurface = null;
 
 function setText(id, value) {
   const el = $(id);
-  if (el) { el.textContent = String(value ?? ""); }
+  if (el) el.textContent = String(value ?? "");
 }
 
 function setClass(id, value) {
   const el = $(id);
-  if (el) { el.className = value; }
+  if (el) el.className = value;
 }
 
 function send(message) {
@@ -30,11 +30,11 @@ function send(message) {
 
 function providerFromUrl(url) {
   const u = String(url || "").toLowerCase();
-  if (u.includes("chatgpt.com") || u.includes("chat.openai.com")) { return "ChatGPT"; }
-  if (u.includes("claude.ai")) { return "Claude"; }
-  if (u.includes("gemini.google.com")) { return "Gemini"; }
-  if (u.includes("grok.com") || u.includes("x.ai")) { return "Grok"; }
-  if (u.includes("perplexity.ai")) { return "Perplexity"; }
+  if (u.includes("chatgpt.com") || u.includes("chat.openai.com")) return "ChatGPT";
+  if (u.includes("claude.ai")) return "Claude";
+  if (u.includes("gemini.google.com")) return "Gemini";
+  if (u.includes("grok.com") || u.includes("x.ai")) return "Grok";
+  if (u.includes("perplexity.ai")) return "Perplexity";
   return "unknown";
 }
 
@@ -58,7 +58,6 @@ function getActiveTab() {
 
 async function loadActiveTabSurface() {
   const tab = await getActiveTab();
-
   if (!tab) {
     activeTabSurface = null;
     return null;
@@ -75,23 +74,12 @@ async function loadActiveTabSurface() {
 }
 
 function lastSavedText(timeline) {
-  if (!Array.isArray(timeline) || timeline.length === 0) {
-    return "No saved capture shown yet.";
-  }
-
+  if (!Array.isArray(timeline) || timeline.length === 0) return "No saved capture shown yet.";
   const last = timeline[timeline.length - 1];
   const raw = last.stopped_utc || last.started_utc || "";
-
-  if (!raw) {
-    return "Last saved capture available.";
-  }
-
-  try {
-    const d = new Date(raw);
-    return "Last saved: " + d.toLocaleString();
-  } catch (_) {
-    return "Last saved: " + raw;
-  }
+  if (!raw) return "Last saved capture available.";
+  try { return "Last saved: " + new Date(raw).toLocaleString(); }
+  catch (_) { return "Last saved: " + raw; }
 }
 
 function render(state, timeline) {
@@ -109,12 +97,13 @@ function render(state, timeline) {
   setClass("status", isActive ? "status live" : (isSupported ? "status ready" : "status bad"));
 
   setText("site", isSupported ? surface.provider : (surface.domain || "Unsupported site"));
-  const cleanTitle = String(surface.title || "").trim();
-  const displayTitle = cleanTitle && cleanTitle.toLowerCase() !== "haai"
-    ? cleanTitle
-    : (isSupported ? "AI page detected" : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.");
 
-  setText("title", displayTitle);
+  const cleanTitle = String(surface.title || "").trim();
+  setText("title", cleanTitle && cleanTitle.toLowerCase() !== "haai"
+    ? cleanTitle
+    : (isSupported ? "AI page detected" : "Open ChatGPT, Claude, Gemini, Grok, or another supported AI page.")
+  );
+
   setText("messages", recordedSurface.message_count || 0);
   setText("events", eventCount);
   setText("lastSaved", lastSavedText(currentTimeline));
@@ -124,7 +113,7 @@ function render(state, timeline) {
     primary.disabled = !isSupported && !isActive;
     primary.textContent = isActive ? "Stop Recording" : "Start Recording";
     primary.className = isActive ? "stop" : "primary";
-    if (!isSupported && !isActive) { primary.className = "primary disabled"; }
+    if (!isSupported && !isActive) primary.className = "primary disabled";
   }
 
   setText("message", isActive
@@ -137,16 +126,13 @@ function render(state, timeline) {
 
 async function refresh() {
   await loadActiveTabSurface();
-
   const response = await send({ type:"haai_get_state" });
-
   if (!response || response.ok === false) {
     setText("status", "Needs Attention");
     setClass("status", "status bad");
     setText("message", "HAAI state failed: " + ((response && response.error) || "No response returned."));
     return;
   }
-
   render(response.state || response, response.timeline || []);
 }
 
@@ -173,26 +159,22 @@ async function toggleRecording() {
 
 function bind(id, fn) {
   const el = $(id);
-  if (el) { el.addEventListener("click", fn); }
+  if (el) el.addEventListener("click", fn);
 }
 
 bind("primaryAction", toggleRecording);
 
 bind("advancedToggle", () => {
   const panel = $("advanced");
-  if (panel) { panel.classList.toggle("open"); }
+  if (panel) panel.classList.toggle("open");
 });
 
 bind("openReplay", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/replay_center.html") });
 });
 
-
-});
-
 bind("exportSession", async () => {
   setText("message", "Exporting evidence...");
-
   const response = await send({ type:"haai_export_session" });
 
   if (!response || response.ok === false) {
@@ -203,7 +185,5 @@ bind("exportSession", async () => {
   setText("message", "Exported. Check browser downloads.\n" + (response.filename || ""));
   await refresh();
 });
-
-
 
 refresh();
