@@ -16,6 +16,19 @@ function setClass(id, value) {
   if (el) el.className = value;
 }
 
+function downloadText(filename, body, mimeType) {
+  const blob = new Blob([body || ""], { type: mimeType || "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  chrome.downloads.download({
+    url: url,
+    filename: filename || "haai_session_export.json",
+    saveAs: true
+  }, () => {
+    try { URL.revokeObjectURL(url); } catch (_) {}
+  });
+}
+
 function send(message) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(message, (response) => {
@@ -183,7 +196,12 @@ bind("exportSession", async () => {
     return;
   }
 
-  setText("message", "Exported. Check browser downloads.\n" + (response.filename || ""));
+  if (response.body) {
+    downloadText(response.filename || "haai_session_export.json", response.body, "application/json");
+    setText("message", "Export download started.\n" + (response.filename || ""));
+  } else {
+    setText("message", "Export created, but no file body was returned.");
+  }
   await refresh();
 });
 
