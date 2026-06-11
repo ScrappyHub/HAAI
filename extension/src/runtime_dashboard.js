@@ -17,15 +17,25 @@ function setClass(id, value) {
 }
 
 function downloadText(filename, body, mimeType) {
-  const blob = new Blob([body || ""], { type: mimeType || "application/json" });
-  const url = URL.createObjectURL(blob);
+  return new Promise((resolve) => {
+    const blob = new Blob([body || ""], { type: mimeType || "application/json" });
+    const url = URL.createObjectURL(blob);
 
-  chrome.downloads.download({
-    url: url,
-    filename: filename || "haai_session_export.json",
-    saveAs: true
-  }, () => {
-    try { URL.revokeObjectURL(url); } catch (_) {}
+    chrome.downloads.download({
+      url: url,
+      filename: filename || "haai_session_export.json",
+      saveAs: false
+    }, (downloadId) => {
+      const err = chrome.runtime.lastError ? chrome.runtime.lastError.message : "";
+      try { URL.revokeObjectURL(url); } catch (_) {}
+
+      if (err) {
+        resolve({ ok:false, error:err });
+        return;
+      }
+
+      resolve({ ok:true, download_id:downloadId });
+    });
   });
 }
 
@@ -185,7 +195,8 @@ bind("openReplay", () => {
 });
 
 bind("exportSession", async () => {
-  setText("message", "Exporting evidence...");
+  setText("message", "Preparing export...");
+
   const response = await send({ type:"haai_export_session" });
 
   if (!response || response.ok === false) {
@@ -193,13 +204,23 @@ bind("exportSession", async () => {
     return;
   }
 
-  if (response.body) {
-    downloadText(response.filename || "haai_session_export.json", response.body, "application/json");
-    setText("message", "Export download started.\n" + (response.filename || ""));
-  } else {
-    setText("message", "Export created, but no file body was returned.");
+  if (!response.body) {
+    setText("message", "Export failed: no file body returned.");
+    return;
   }
-  await refresh();
+
+  const result = await downloadText(
+    response.filename || "haai_session_export.json",
+    response.body,
+    "application/json"
+  );
+
+  if (!result.ok) {
+    setText("message", "Download failed: " + (result.error || "unknown error"));
+    return;
+  }
+
+  setText("message", "Export downloaded.\n" + (response.filename || "haai_session_export.json"));
 });
 
 refresh();
