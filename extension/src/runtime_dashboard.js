@@ -178,10 +178,7 @@ function bind(id, fn) {
 
 bind("primaryAction", toggleRecording);
 
-bind("advancedToggle", () => {
-  const panel = $("advanced");
-  if (panel) panel.classList.toggle("open");
-});
+
 
 bind("openReplay", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("src/replay_center.html") });

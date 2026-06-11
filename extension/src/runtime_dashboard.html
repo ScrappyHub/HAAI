@@ -26,10 +26,6 @@
     .last{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.35}
     .primaryActionWrap{margin-top:10px}
     .secondaryAction{background:#17263d;color:#dbeafe;border:1px solid var(--line)}
-    .advancedToggle{margin-top:14px;background:#17263d;color:#dbeafe;border:1px solid var(--line)}
-    .advanced{display:none;margin-top:10px;gap:8px}
-    .advanced.open{display:grid}
-    .advanced button{background:#1e2d46;color:#e9f2ff;border:1px solid var(--line);padding:10px;font-size:12px}
     .msg{margin-top:12px;border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.07);border-radius:12px;padding:10px;color:#dbeafe;font-size:12px;line-height:1.35}
   </style>
 </head>
@@ -58,15 +54,11 @@
       </div>
       <div class="primaryActionWrap">
         <button id="exportSession" class="secondaryAction">Export Latest Capture</button>
+        <button id="openReplay" class="secondaryAction">Replay Center</button>
       </div>
 
       <div id="lastSaved" class="last">No saved capture shown yet.</div>
       <div id="message" class="msg">Open a supported AI page to record.</div>
-
-      <button id="advancedToggle" class="advancedToggle">Advanced</button>
-      <div id="advanced" class="advanced">
-        <button id="openReplay">Replay Center</button>
-      </div>
     </div>
   </div>
 
