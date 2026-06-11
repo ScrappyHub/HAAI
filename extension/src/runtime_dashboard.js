@@ -90,7 +90,9 @@ async function loadActiveTabSurface() {
     provider: providerFromUrl(tab.url || ""),
     domain: domainFromUrl(tab.url || ""),
     title: tab.title || "",
-    url: tab.url || ""
+    url: tab.url || "",
+    id: tab.id,
+    windowId: tab.windowId
   };
 
   return activeTabSurface;
@@ -171,7 +173,16 @@ async function toggleRecording() {
     return;
   }
 
-  const response = await send({ type: isActive ? "haai_stop_capture" : "haai_begin_capture" });
+  const response = await send(isActive
+    ? { type: "haai_stop_capture" }
+    : {
+        type: "haai_begin_capture",
+        capture_tab_id: activeTabSurface ? activeTabSurface.id : null,
+        capture_window_id: activeTabSurface ? activeTabSurface.windowId : null,
+        capture_url: activeTabSurface ? activeTabSurface.url : "",
+        capture_origin: activeTabSurface ? (new URL(activeTabSurface.url || location.href)).origin : ""
+      }
+  );
 
   if (!response || response.ok === false) {
     setText("message", "Recording action failed: " + ((response && response.error) || "No response returned."));

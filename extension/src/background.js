@@ -8,6 +8,10 @@ const DEFAULT_STATE = {
   extension_version: "0.1.0",
   active_capture: false,
   session_id: "",
+  capture_tab_id: null,
+  capture_window_id: null,
+  capture_url: "",
+  capture_origin: "",
   session_started_utc: "",
   session_stopped_utc: "",
   current_domain: "",
@@ -32,6 +36,36 @@ const DEFAULT_STATE = {
   },
   events: []
 };
+
+
+function originFromUrl(url) {
+  try {
+    return new URL(String(url || "")).origin;
+  } catch (_) {
+    return "";
+  }
+}
+
+function tabIdFromSender(sender) {
+  return sender && sender.tab && Number.isFinite(sender.tab.id) ? sender.tab.id : null;
+}
+
+function windowIdFromSender(sender) {
+  return sender && sender.tab && Number.isFinite(sender.tab.windowId) ? sender.tab.windowId : null;
+}
+
+function eventAllowedForCapture(state, sender) {
+  if (!state || !state.active_capture) {
+    return false;
+  }
+
+  if (state.capture_tab_id === null || typeof state.capture_tab_id === "undefined") {
+    return true;
+  }
+
+  const senderTabId = tabIdFromSender(sender);
+  return senderTabId === state.capture_tab_id;
+}
 
 function cloneDefault() {
   return JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -144,6 +178,10 @@ function frozenReplayFromState(state) {
     session_started_utc: state.session_started_utc || "",
     session_stopped_utc: state.session_stopped_utc || "",
     surface: state.surface || {},
+    capture_tab_id: state.capture_tab_id || null,
+    capture_window_id: state.capture_window_id || null,
+    capture_url: state.capture_url || "",
+    capture_origin: state.capture_origin || "",
     lifecycle: state.lifecycle || {},
     event_count: Array.isArray(state.events) ? state.events.length : 0,
     events: Array.isArray(state.events) ? state.events : []
@@ -210,6 +248,10 @@ function exportEnvelopeFromReplay(replay, createdUtc) {
     session_started_utc: replay.session_started_utc,
     session_stopped_utc: replay.session_stopped_utc,
     surface: replay.surface,
+    capture_tab_id: replay.capture_tab_id || null,
+    capture_window_id: replay.capture_window_id || null,
+    capture_url: replay.capture_url || "",
+    capture_origin: replay.capture_origin || "",
     lifecycle: replay.lifecycle,
     event_count: Array.isArray(replay.events) ? replay.events.length : 0,
     events: Array.isArray(replay.events) ? replay.events : []
@@ -250,11 +292,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       fresh.session_id = "session_" + now.replace(/[:.]/g, "-");
       fresh.session_started_utc = now;
       fresh.session_stopped_utc = "";
+      fresh.capture_tab_id = Number.isFinite(message.capture_tab_id) ? message.capture_tab_id : null;
+      fresh.capture_window_id = Number.isFinite(message.capture_window_id) ? message.capture_window_id : null;
+      fresh.capture_url = message.capture_url || "";
+      fresh.capture_origin = originFromUrl(message.capture_url || "");
       fresh.lifecycle.session_started = true;
       fresh.lifecycle.session_stopped = false;
 
       addEvent(fresh, makeEvent("session_started", "background", {
-        session_id: fresh.session_id
+        session_id: fresh.session_id,
+        capture_tab_id: fresh.capture_tab_id,
+        capture_window_id: fresh.capture_window_id,
+        capture_origin: fresh.capture_origin,
+        capture_url: fresh.capture_url
       }));
 
       await saveState(fresh);
