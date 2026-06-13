@@ -361,6 +361,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
+      if (!eventAllowedForCapture(state, sender)) {
+        sendResponse({
+          ok: true,
+          message: "Event ignored. Capture is scoped to a different tab.",
+          ignored: true,
+          reason: "TAB_SCOPE_MISMATCH",
+          capture_tab_id: state.capture_tab_id,
+          sender_tab_id: tabIdFromSender(sender)
+        });
+        return;
+      }
       const event = message.event || {};
       event.session_id = state.session_id || "";
 
