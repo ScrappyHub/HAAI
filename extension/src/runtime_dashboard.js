@@ -150,6 +150,43 @@ function render(state, timeline) {
   );
 }
 
+
+async function ensureContentScript(tabId) {
+  try {
+    if (chrome.scripting && chrome.scripting.executeScript) {
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ["src/content_script.js"]
+      });
+    }
+  } catch (_) {}
+}
+
+function sendTabMessage(tabId, message) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ ok:false, error:chrome.runtime.lastError.message });
+        return;
+      }
+      resolve(response || { ok:false, error:"No response returned." });
+    });
+  });
+}
+
+async function forceSnapshotFromActiveTab() {
+  if (!activeTabSurface || !Number.isFinite(activeTabSurface.id)) {
+    return { ok:false, error:"NO_ACTIVE_TAB" };
+  }
+
+  await ensureContentScript(activeTabSurface.id);
+
+  const probe = await sendTabMessage(activeTabSurface.id, { type:"haai_probe_page" });
+
+  await sendTabMessage(activeTabSurface.id, { type:"haai_force_snapshot" });
+
+  return probe || { ok:true };
+}
 async function refresh() {
   await loadActiveTabSurface();
   const response = await send({ type:"haai_get_state" });
