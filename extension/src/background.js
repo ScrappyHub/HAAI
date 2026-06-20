@@ -123,6 +123,48 @@ function addEvent(state, event) {
   }
 }
 
+
+function snapshotReplaceKey(event) {
+  if (!event || event.event_type !== "conversation_snapshot" || !event.payload) {
+    return "";
+  }
+
+  const p = event.payload || {};
+  const conversation = p.conversation_id || p.url || p.domain || "";
+  const count = Number.isFinite(p.message_count) ? p.message_count : 0;
+
+  return conversation + "::" + String(count);
+}
+
+function addOrReplaceSnapshotEvent(state, event) {
+  if (!event || event.event_type !== "conversation_snapshot") {
+    addEvent(state, event);
+    return;
+  }
+
+  const key = snapshotReplaceKey(event);
+
+  if (!key || !Array.isArray(state.events)) {
+    addEvent(state, event);
+    return;
+  }
+
+  for (let i = state.events.length - 1; i >= 0; i -= 1) {
+    const existing = state.events[i];
+
+    if (!existing || existing.event_type !== "conversation_snapshot") {
+      continue;
+    }
+
+    if (snapshotReplaceKey(existing) === key) {
+      state.events[i] = event;
+      return;
+    }
+  }
+
+  addEvent(state, event);
+}
+
 function updateSurfaceAndLifecycle(state, event) {
   if (!event || !event.payload) { return; }
 
@@ -376,7 +418,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       event.session_id = state.session_id || "";
 
       updateSurfaceAndLifecycle(state, event);
-      addEvent(state, event);
+      addOrReplaceSnapshotEvent(state, event);
 
       await saveState(state);
 

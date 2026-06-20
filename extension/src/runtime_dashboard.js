@@ -210,6 +210,10 @@ async function toggleRecording() {
     return;
   }
 
+  if (isActive) {
+    await forceSnapshotFromActiveTab();
+  }
+
   const response = await send(isActive
     ? { type: "haai_stop_capture" }
     : {
@@ -224,6 +228,10 @@ async function toggleRecording() {
   if (!response || response.ok === false) {
     setText("message", "Recording action failed: " + ((response && response.error) || "No response returned."));
     return;
+  }
+
+  if (!isActive) {
+    await forceSnapshotFromActiveTab();
   }
 
   await refresh();
