@@ -26,6 +26,11 @@
     .last{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.35}
     .primaryActionWrap{margin-top:10px}
     .secondaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .exportGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .exportMode{width:100%;border:1px solid var(--line);background:#0f172a;color:#e9f2ff;border-radius:12px;padding:10px;font-weight:800}
+    .sessionStats{width:100%;margin-top:12px;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+    .sessionStats th{font-size:10px;text-transform:uppercase;color:#94a3b8;background:#0b1220;padding:8px;border-bottom:1px solid var(--line)}
+    .sessionStats td{font-size:18px;font-weight:900;text-align:center;color:#f8fafc;padding:10px;background:#111c2e}
 .secondaryAction{background:#17263d;color:#dbeafe;border:1px solid var(--line)}
     .msg{margin-top:12px;border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.07);border-radius:12px;padding:10px;color:#dbeafe;font-size:12px;line-height:1.35}
   </style>
@@ -59,6 +64,10 @@
       </div>
 
       <div id="lastSaved" class="last">No saved capture shown yet.</div>
+      <table class="sessionStats">
+        <thead><tr><th>Last session</th><th>Total recorded</th><th>Total exported</th></tr></thead>
+        <tbody><tr><td id="lastSessionCount">0</td><td id="totalSessionsCount">0</td><td id="totalExportsCount">0</td></tr></tbody>
+      </table>
       <div id="message" class="msg">Open a supported AI page to record.</div>
     </div>
   </div>

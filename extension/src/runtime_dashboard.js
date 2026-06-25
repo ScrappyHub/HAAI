@@ -133,6 +133,17 @@ function render(state, timeline) {
   setText("messages", recordedSurface.message_count || 0);
   setText("events", eventCount);
   setText("lastSaved", lastSavedText(currentTimeline));
+  const latestSession = currentTimeline.length ? currentTimeline[currentTimeline.length - 1] : null;
+  const lastSessionNumber = latestSession && Number.isFinite(Number(latestSession.message_count))
+    ? Number(latestSession.message_count)
+    : Number(recordedSurface.message_count || 0);
+  const totalExports = currentTimeline.reduce((sum, item) => {
+    return sum + (Number(item.export_count || item.exports || 0) || 0);
+  }, 0);
+
+  setText("lastSessionCount", lastSessionNumber);
+  setText("totalSessionsCount", currentTimeline.length);
+  setText("totalExportsCount", totalExports);
 
   const primary = $("primaryAction");
   if (primary) {
@@ -199,6 +210,21 @@ async function refresh() {
   render(response.state || response, response.timeline || []);
 }
 
+
+function exportRequestOptions() {
+  const modeEl = $("exportMode");
+  const mode = modeEl ? modeEl.value : "last20";
+
+  if (mode === "full") {
+    return { export_mode:"full", message_limit:null };
+  }
+
+  if (mode === "last50") {
+    return { export_mode:"last50", message_limit:50 };
+  }
+
+  return { export_mode:"last20", message_limit:20 };
+}
 async function toggleRecording() {
   await loadActiveTabSurface();
 
@@ -253,7 +279,12 @@ bind("openReplay", () => {
 bind("exportSession", async () => {
   setText("message", "Preparing export...");
 
-  const response = await send({ type:"haai_export_session" });
+  const opts = exportRequestOptions();
+  const response = await send({
+    type:"haai_export_session",
+    export_mode: opts.export_mode,
+    message_limit: opts.message_limit
+  });
 
   if (!response || response.ok === false) {
     setText("message", "Export failed: " + ((response && response.error) || "No response returned."));

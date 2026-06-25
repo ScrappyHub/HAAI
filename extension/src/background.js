@@ -12,6 +12,8 @@ const DEFAULT_STATE = {
   capture_window_id: null,
   capture_url: "",
   capture_origin: "",
+  capture_baseline_message_count: null,
+  capture_baseline_conversation_id: "",
   session_started_utc: "",
   session_stopped_utc: "",
   current_domain: "",
@@ -165,6 +167,31 @@ function addOrReplaceSnapshotEvent(state, event) {
   addEvent(state, event);
 }
 
+
+function learnCaptureBaselineFromEvent(state, event) {
+  if (!state || !event || !event.payload) {
+    return;
+  }
+
+  if (event.event_type !== "page_probe" && event.event_type !== "conversation_snapshot") {
+    return;
+  }
+
+  if (state.capture_baseline_message_count !== null && typeof state.capture_baseline_message_count !== "undefined") {
+    return;
+  }
+
+  const payload = event.payload || {};
+  const count = Number(payload.message_count);
+
+  if (!Number.isFinite(count)) {
+    return;
+  }
+
+  state.capture_baseline_message_count = Math.max(0, count);
+  state.capture_baseline_conversation_id = payload.conversation_id || payload.url || "";
+}
+
 function updateSurfaceAndLifecycle(state, event) {
   if (!event || !event.payload) { return; }
 
@@ -224,6 +251,8 @@ function frozenReplayFromState(state) {
     capture_window_id: state.capture_window_id || null,
     capture_url: state.capture_url || "",
     capture_origin: state.capture_origin || "",
+    capture_baseline_message_count: Number.isFinite(state.capture_baseline_message_count) ? state.capture_baseline_message_count : 0,
+    capture_baseline_conversation_id: state.capture_baseline_conversation_id || "",
     lifecycle: state.lifecycle || {},
     event_count: Array.isArray(state.events) ? state.events.length : 0,
     events: Array.isArray(state.events) ? state.events : []
@@ -267,6 +296,7 @@ function timelineItemFromState(state, exported, hash, exportedUtc) {
     title: state.surface && state.surface.title ? state.surface.title : "",
     started_utc: state.session_started_utc || "",
     stopped_utc: state.session_stopped_utc || "",
+    export_count: state.lifecycle && Number.isFinite(state.lifecycle.exports) ? state.lifecycle.exports : 0,
     last_activity_utc: state.last_activity_utc || "",
     event_count: Array.isArray(state.events) ? state.events.length : 0,
     message_count: state.surface && state.surface.message_count ? state.surface.message_count : 0,
@@ -294,6 +324,8 @@ function exportEnvelopeFromReplay(replay, createdUtc) {
     capture_window_id: replay.capture_window_id || null,
     capture_url: replay.capture_url || "",
     capture_origin: replay.capture_origin || "",
+    capture_baseline_message_count: Number.isFinite(replay.capture_baseline_message_count) ? replay.capture_baseline_message_count : 0,
+    capture_baseline_conversation_id: replay.capture_baseline_conversation_id || "",
     lifecycle: replay.lifecycle,
     event_count: Array.isArray(replay.events) ? replay.events.length : 0,
     events: Array.isArray(replay.events) ? replay.events : []
@@ -416,6 +448,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       const event = message.event || {};
       event.session_id = state.session_id || "";
+      learnCaptureBaselineFromEvent(state, event);
 
       updateSurfaceAndLifecycle(state, event);
       addOrReplaceSnapshotEvent(state, event);
