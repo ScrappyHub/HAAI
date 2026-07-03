@@ -126,6 +126,121 @@ function addEvent(state, event) {
 }
 
 
+
+function exportSessionPackageV2(replay, createdUtc, options) {
+  const opts = options || {};
+  const exportMode = opts.export_mode || "last20";
+  const requestedLimit = Number(opts.message_limit);
+  const messageLimit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : null;
+
+  const events = Array.isArray(replay.events) ? replay.events : [];
+  const baseline = Number.isFinite(replay.capture_baseline_message_count)
+    ? replay.capture_baseline_message_count
+    : 0;
+
+  function payloadMessages(payload) {
+    if (!payload) {
+      return [];
+    }
+
+    if (Array.isArray(payload.normalized_messages)) {
+      return payload.normalized_messages;
+    }
+
+    if (Array.isArray(payload.messages)) {
+      return payload.messages.map((message, index) => {
+        return {
+          schema: "haai.normalized_message.v1",
+          provider: replay.surface && replay.surface.provider ? replay.surface.provider : "unknown",
+          sequence: index,
+          role: message.role || "unknown",
+          content_text: message.text || message.content_text || "",
+          content_length: Number(message.length || message.content_length || 0),
+          visible: true,
+          streamed: false,
+          tool_calls: [],
+          citation_count: 0,
+          reasoning_visible: false
+        };
+      });
+    }
+
+    return [];
+  }
+
+  function latestSnapshotPayload() {
+    for (let i = events.length - 1; i >= 0; i -= 1) {
+      const event = events[i];
+
+      if (!event || !event.payload) {
+        continue;
+      }
+
+      if (event.event_type === "conversation_snapshot" || event.event_type === "page_probe") {
+        return event.payload;
+      }
+    }
+
+    return {};
+  }
+
+  function summarizeEvent(event) {
+    const summary = {
+      schema: event.schema || "haai.extension_event.v1",
+      event_type: event.event_type || "unknown",
+      created_utc: event.created_utc || "",
+      source: event.source || "",
+      session_id: event.session_id || replay.session_id || ""
+    };
+
+    if (event.payload) {
+      summary.payload_summary = {
+        provider: event.payload.provider || "",
+        domain: event.payload.domain || "",
+        title: event.payload.title || "",
+        url: event.payload.url || "",
+        conversation_id: event.payload.conversation_id || "",
+        message_count: Number(event.payload.message_count || 0),
+        input_detected: event.payload.input_detected === true,
+        detected: event.payload.detected === true
+      };
+    }
+
+    return summary;
+  }
+
+  const latestPayload = latestSnapshotPayload();
+  const allVisibleMessages = payloadMessages(latestPayload);
+  const safeBaseline = Math.min(Math.max(0, baseline), allVisibleMessages.length);
+  const recordedMessages = allVisibleMessages.slice(safeBaseline);
+  const selectedMessages = messageLimit ? recordedMessages.slice(-messageLimit) : recordedMessages;
+
+  return {
+    schema: "haai.extension_session_export.v2",
+    created_utc: createdUtc,
+    session_id: replay.session_id,
+    session_started_utc: replay.session_started_utc,
+    session_stopped_utc: replay.session_stopped_utc,
+    surface: replay.surface,
+    capture_tab_id: replay.capture_tab_id || null,
+    capture_window_id: replay.capture_window_id || null,
+    capture_url: replay.capture_url || "",
+    capture_origin: replay.capture_origin || "",
+    capture_baseline_message_count: safeBaseline,
+    capture_baseline_conversation_id: replay.capture_baseline_conversation_id || "",
+    lifecycle: replay.lifecycle,
+    export_mode: exportMode,
+    message_limit: messageLimit,
+    visible_message_count: allVisibleMessages.length,
+    recorded_message_count: recordedMessages.length,
+    exported_message_count: selectedMessages.length,
+    messages: selectedMessages,
+    event_count: events.length,
+    events: events.map(summarizeEvent),
+    raw_event_payloads_omitted: true
+  };
+}
+
 function snapshotReplaceKey(event) {
   if (!event || event.event_type !== "conversation_snapshot" || !event.payload) {
     return "";
